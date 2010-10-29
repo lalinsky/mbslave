@@ -1,0 +1,11 @@
+[DATABASE]
+host=localhost
+port=5432
+name=musicbrainz_db
+user=musicbrainz_user
+schema=public
+
+[TABLES]
+ignore=
+#ignore=albumwords,trackwords,artistwords,labelwords,wordlist,puid,puidjoin,trm,trmjoin
+
