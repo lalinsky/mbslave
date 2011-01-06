@@ -6,7 +6,7 @@ import os
 config = ConfigParser.RawConfigParser()
 config.read(os.path.dirname(__file__) + '/mbslave.conf')
 
-args = []
+args = ['pgsql']
 args.append('-U')
 args.append(config.get('DATABASE', 'user'))
 if config.has_option('DATABASE', 'host'):
