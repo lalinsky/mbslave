@@ -20,63 +20,62 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
-#   $Id: PopulateCountries.pl 8551 2006-10-19 20:10:48Z robert $
+#   $Id$
 #____________________________________________________________________________
 
 # Abstract: populate the "countries" table from the ISO 3166 countries list
 
 use FindBin;
-use lib "$FindBin::Bin/../../cgi-bin";
+use lib "$FindBin::Bin/../../lib";
 
 use DBDefs;
-use MusicBrainz;
+use MusicBrainz::Server::Context;
 use Sql;
 
-my $mb = MusicBrainz->new;
-$mb->Login;
-my $sql = Sql->new($mb->{DBH});
+my $mb = MusicBrainz::Server::Context->new;
+my $sql = Sql->new($mb->dbh);
 
 use strict;
 
 my $fh;
 if (@ARGV)
 {
-	$fh = *ARGV;
+    $fh = *ARGV;
 } else {
-	my $url = 'http://ftp.ics.uci.edu/pub/ietf/http/related/iso3166.txt';
-	open($fh, "wget --quiet -O- $url |")
-		or die $!;
+    my $url = 'http://ftp.ics.uci.edu/pub/ietf/http/related/iso3166.txt';
+    open($fh, "wget --quiet -O- $url |")
+        or die $!;
 }
 
-$sql->Begin;
+$sql->begin;
 my $n = 0;
 
 while (<$fh>)
 {
-	/^(.*?)\s+([A-Z][A-Z])\s+([A-Z][A-Z][A-Z])\s+(\d\d\d)(?:\s|$)/
-		or next;
-	my ($name, $isocode) = ($1, $2);
+    /^(.*?)\s+([A-Z][A-Z])\s+([A-Z][A-Z][A-Z])\s+(\d\d\d)(?:\s|$)/
+        or next;
+    my ($name, $isocode) = ($1, $2);
 
-	$name = lc $name;
-	$name =~ s/\b(\w)/uc $1/eg;
-	$name =~ s/\bD'/d'/g;
-	$name =~ s/'S\b/'s/g;
-	$name =~ s/\bAnd\b/and/g;
-	$name =~ s/\bOf\b/of/g;
+    $name = lc $name;
+    $name =~ s/\b(\w)/uc $1/eg;
+    $name =~ s/\bD'/d'/g;
+    $name =~ s/'S\b/'s/g;
+    $name =~ s/\bAnd\b/and/g;
+    $name =~ s/\bOf\b/of/g;
 
-	$sql->SelectSingleValue(
-		"SELECT id FROM country WHERE name = ? AND isocode = ?",
-		$name, $isocode,
-	) and next;
+    $sql->select_single_value(
+        "SELECT id FROM country WHERE name = ? AND isocode = ?",
+        $name, $isocode,
+    ) and next;
 
-	$sql->Do(
-		"INSERT INTO country (name, isocode) VALUES (?, ?)",
-		$name, $isocode,
-	);
-	++$n;
+    $sql->do(
+        "INSERT INTO country (name, isocode) VALUES (?, ?)",
+        $name, $isocode,
+    );
+    ++$n;
 }
 
-$sql->Commit;
+$sql->commit;
 
 print "Loaded $n countries\n";
 

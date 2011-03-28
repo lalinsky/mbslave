@@ -1,633 +1,65 @@
 \set ON_ERROR_STOP 1
+BEGIN;
 
---'-----------------------------------------------------------------
--- The join(VARCHAR) aggregate
---'-----------------------------------------------------------------
+-- We may want to create a CreateAggregate.sql script, but it seems silly to do that for one aggregate
+CREATE AGGREGATE array_accum (basetype = anyelement, sfunc = array_append, stype = anyarray, initcond = '{}');
 
-CREATE OR REPLACE FUNCTION join_append(VARCHAR, VARCHAR)
-RETURNS VARCHAR AS '
+-- This function calculates an integer based on the first 6
+-- characters of the input. First, it strips accents, converts to upper case
+-- and removes everything except ASCII characters A-Z and space. That means
+-- we can fit one character into 5 bits and the first 6 characters into a
+-- 32-bit integer.
+CREATE OR REPLACE FUNCTION page_index(txt varchar) RETURNS integer AS $$
 DECLARE
-    state ALIAS FOR $1;
-    value ALIAS FOR $2;
+    input varchar;
+    res integer;
+    i integer;
+    x varchar;
 BEGIN
-    IF (value IS NULL) THEN RETURN state; END IF;
-    IF (state IS NULL) THEN
-        RETURN value;
-    ELSE
-        RETURN(state || '' '' || value);
-    END IF;
-END;
-' LANGUAGE 'plpgsql';
-
-CREATE AGGREGATE join(BASETYPE = VARCHAR, SFUNC=join_append, STYPE=VARCHAR);
-
---'-----------------------------------------------------------------
--- Populate the albummeta table, one-to-one join with album.
--- All columns are non-null integers, except firstreleasedate
--- which is CHAR(10) WITH NULL
---'-----------------------------------------------------------------
-
-create or replace function fill_album_meta () returns integer as '
-declare
-
-   table_count integer;
-
-begin
-
-   raise notice ''Truncating table albummeta'';
-   truncate table albummeta;
-
-   raise notice ''Counting tracks'';
-   create temporary table albummeta_tracks as select album.id, count(albumjoin.album) 
-                from album left join albumjoin on album.id = albumjoin.album group by album.id;
-
-   raise notice ''Counting discids'';
-   create temporary table albummeta_discids as select album.id, count(album_cdtoc.album) 
-                from album left join album_cdtoc on album.id = album_cdtoc.album group by album.id;
-
-   raise notice ''Counting puids'';
-   create temporary table albummeta_puids as select album.id, count(puidjoin.track) 
-                from album, albumjoin left join puidjoin on albumjoin.track = puidjoin.track 
-                where album.id = albumjoin.album group by album.id;
-
-    raise notice ''Finding first release dates'';
-    CREATE TEMPORARY TABLE albummeta_firstreleasedate AS
-        SELECT  album AS id, MIN(releasedate)::CHAR(10) AS firstreleasedate
-        FROM    release
-        GROUP BY album;
-
-   raise notice ''Filling albummeta table'';
-   insert into albummeta (id, tracks, discids, puids, firstreleasedate, asin, coverarturl, dateadded, lastupdate)
-   select a.id,
-            COALESCE(t.count, 0) AS tracks,
-            COALESCE(d.count, 0) AS discids,
-            COALESCE(p.count, 0) AS puids,
-            r.firstreleasedate,
-            aws.asin,
-            aws.coverarturl,
-            timestamp ''1970-01-01 00:00:00-00'',
-            NULL
-    FROM    album a
-            LEFT JOIN albummeta_tracks t ON t.id = a.id
-            LEFT JOIN albummeta_discids d ON d.id = a.id
-            LEFT JOIN albummeta_puids p ON p.id = a.id
-            LEFT JOIN albummeta_firstreleasedate r ON r.id = a.id
-            LEFT JOIN album_amazon_asin aws on aws.album = a.id
-            ;
-
-   drop table albummeta_tracks;
-   drop table albummeta_discids;
-   drop table albummeta_puids;
-   drop table albummeta_firstreleasedate;
-
-   return 1;
-
-end;
-' language 'plpgsql';
-
---'-----------------------------------------------------------------
--- Keep rows in albummeta in sync with album
---'-----------------------------------------------------------------
-
-create or replace function insert_album_meta () returns TRIGGER as $$
-begin 
-    insert into albummeta (id, tracks, discids, puids, lastupdate) values (NEW.id, 0, 0, 0, now()); 
-    insert into album_amazon_asin (album, lastupdate) values (NEW.id, '1970-01-01 00:00:00'); 
-    PERFORM propagate_lastupdate(NEW.id, CAST('album' AS name));
-    UPDATE release_group_meta SET releasecount = releasecount + 1 WHERE id=NEW.release_group;
-    
-    return NEW; 
-end; 
-$$ language 'plpgsql';
-
-create or replace function update_album_meta () returns TRIGGER as $$
-begin
-    IF (NEW.name != OLD.name) 
-    THEN
-        UPDATE album_amazon_asin SET lastupdate = '1970-01-01 00:00:00' WHERE album = NEW.id; 
-    END IF;
-    IF (NEW.release_group != OLD.release_group)
-    THEN
-        PERFORM set_release_group_firstreleasedate(OLD.release_group);
-        PERFORM set_release_group_firstreleasedate(NEW.release_group);
-        UPDATE release_group_meta SET releasecount = releasecount - 1 WHERE id=OLD.release_group;
-        UPDATE release_group_meta SET releasecount = releasecount + 1 WHERE id=NEW.release_group;
-    END IF;
-    IF (NEW.modpending = OLD.modpending)
-    THEN
-        UPDATE albummeta SET lastupdate = now() WHERE id = NEW.id; 
-        PERFORM propagate_lastupdate(NEW.id, CAST('album' AS name));
-    END IF;
-   return NULL;
-end;
-$$ language 'plpgsql';
-
---'-----------------------------------------------------------------
--- Keep rows in <entity>_meta table in sync with table <entity>
--- Deletion is done by cascade with foreign keys
---'-----------------------------------------------------------------
-
-create or replace function a_iu_entity () returns TRIGGER as $$
-begin 
-    IF (TG_OP = 'INSERT') 
-    THEN
-        EXECUTE 'INSERT INTO ' || TG_RELNAME || '_meta (id) VALUES (' || NEW.id || ')';
-        PERFORM propagate_lastupdate(NEW.id, TG_RELNAME);
-    ELSIF (TG_OP = 'UPDATE')
-    THEN
-        IF (NEW.modpending = OLD.modpending)
-        THEN
-            IF (TG_RELNAME != 'track')
-            THEN
-                EXECUTE 'UPDATE ' || TG_RELNAME || '_meta SET lastupdate = now() WHERE id = ' || NEW.id; 
-            END IF;
-            PERFORM propagate_lastupdate(NEW.id, TG_RELNAME);
-        END IF;             
-    END IF;
-    RETURN NULL; 
-end; 
-$$ language 'plpgsql';
-
-create or replace function b_del_entity () returns TRIGGER as $$
-begin 
-    IF (TG_RELNAME = 'album')
-    THEN
-        PERFORM set_release_group_firstreleasedate(OLD.release_group);
-        UPDATE release_group_meta SET releasecount = releasecount - 1 WHERE id=OLD.release_group;
-    END IF;
-    PERFORM propagate_lastupdate(OLD.id, TG_RELNAME);
-    RETURN OLD; 
-end;
-$$ language 'plpgsql';
-
---'-----------------------------------------------------------------
--- Propagates changes on entity to linked entities 
---'-----------------------------------------------------------------
-create or replace function propagate_lastupdate (entity_id integer, relname name) returns VOID as $$
-begin 
-
---- This function caused the entire database to slow to a crawl and has been removed for now.
---- This functionality will have to be carefully re-considered in the future.
-
-end; 
-$$ language 'plpgsql';
-
---'-----------------------------------------------------------------
--- Changes to albumjoin could cause changes to albummeta.tracks
--- and/or albummeta.puids and/or albummeta.puids
---'-----------------------------------------------------------------
-
-create or replace function a_ins_albumjoin () returns trigger as $$
-begin
-    UPDATE  albummeta
-    SET     tracks = tracks + 1,
-            puids = puids + (SELECT COUNT(*) FROM puidjoin WHERE track = NEW.track)
-    WHERE   id = NEW.album;
-    PERFORM propagate_lastupdate(NEW.track, CAST('track' AS name));
-
-    return NULL;
-end;
-$$ language 'plpgsql';
---'--
-create or replace function a_upd_albumjoin () returns trigger as $$
-begin
-    if NEW.album = OLD.album AND NEW.track = OLD.track
-    then
-        -- Sequence has been changed
-        IF (NEW.modpending = OLD.modpending) 
-        THEN
-            PERFORM propagate_lastupdate(OLD.track, CAST('track' AS name));
+    input := regexp_replace(upper(substr(unaccent(txt), 1, 6)), '[^A-Z ]', '_', 'g');
+    res := 0;
+    FOR i IN 1..6 LOOP
+        x := substr(input, i, 1);
+        IF x = '_' OR x = '' THEN
+            res := (res << 5);
+        ELSIF x = ' ' THEN
+            res := (res << 5) | 1;
+        ELSE
+            res := (res << 5) | (ascii(x) - 63);
         END IF;
-
-    elsif NEW.track = OLD.track
-    then
-        -- A track is moved from an album to another one
-        UPDATE  albummeta
-        SET     tracks = tracks - 1,
-                puids = puids - (SELECT COUNT(*) FROM puidjoin WHERE track = OLD.track),
-                lastupdate = now()
-        WHERE   id = OLD.album;
-        -- For the old album we can't do anything better than propagete lastupdate at the album level
-        PERFORM propagate_lastupdate(OLD.album, CAST('album' AS name));
-
-        UPDATE  albummeta
-        SET     tracks = tracks + 1,
-                puids = puids + (SELECT COUNT(*) FROM puidjoin WHERE track = NEW.track)
-        WHERE   id = NEW.album;
-        PERFORM propagate_lastupdate(NEW.track, CAST('track' AS name));
-
-    elsif NEW.album = OLD.album
-    then
-        -- TODO: should not happen yet
-    end if;
-
-    return NULL;
-end;
-$$ language 'plpgsql';
---'--
-create or replace function a_del_albumjoin () returns trigger as $$
-begin
-    UPDATE  albummeta
-    SET     tracks = tracks - 1,
-            puids = puids - (SELECT COUNT(*) FROM puidjoin WHERE track = OLD.track)
-    WHERE   id = OLD.album;
-
-    return NULL;
-end;
-$$ language 'plpgsql';
-
-create or replace function b_del_albumjoin () returns TRIGGER as $$
-begin 
-    PERFORM propagate_lastupdate(OLD.track, CAST('track' AS name));
-    RETURN OLD; 
-end;
-$$ language 'plpgsql';
-
---'-----------------------------------------------------------------
--- Changes to album_cdtoc could cause changes to albummeta.discids
---'-----------------------------------------------------------------
-
-create or replace function a_ins_album_cdtoc () returns trigger as $$ 
-begin
-    UPDATE  albummeta
-    SET     discids = discids + 1,
-            lastupdate = now()
-    WHERE   id = NEW.album;
-    PERFORM propagate_lastupdate(NEW.album, CAST('album' AS name));
-
-    return NULL;
-end;
-$$ language 'plpgsql';
---'--
-create or replace function a_upd_album_cdtoc () returns trigger as $$
-begin
-    if NEW.album = OLD.album
-    then
-        return NULL;
-    end if;
-
-    UPDATE  albummeta
-    SET     discids = discids - 1,
-            lastupdate = now()
-    WHERE   id = OLD.album;
-    PERFORM propagate_lastupdate(OLD.album, CAST('album' AS name));
-
-    UPDATE  albummeta
-    SET     discids = discids + 1,
-            lastupdate = now()
-    WHERE   id = NEW.album;
-    PERFORM propagate_lastupdate(NEW.album, CAST('album' AS name));
-
-    return NULL;
-end;
-$$ language 'plpgsql';
---'--
-create or replace function a_del_album_cdtoc () returns trigger as $$
-begin
-    UPDATE  albummeta
-    SET     discids = discids - 1,
-            lastupdate = now()
-    WHERE   id = OLD.album;
-    PERFORM propagate_lastupdate(OLD.album, CAST('album' AS name));
-
-    return NULL;
-end;
-$$ language 'plpgsql';
-
-
---'-----------------------------------------------------------------
--- Changes to puidjoin could cause changes to albummeta.puids
---'-----------------------------------------------------------------
-
-create or replace function a_ins_puidjoin () returns trigger as '
-begin
-    UPDATE  albummeta
-    SET     puids = puids + 1
-    WHERE   id IN (SELECT album FROM albumjoin WHERE track = NEW.track);
-
-    return NULL;
-end;
-' language 'plpgsql';
---'--
-create or replace function a_upd_puidjoin () returns trigger as '
-begin
-    if NEW.track = OLD.track
-    then
-        return NULL;
-    end if;
-
-    UPDATE  albummeta
-    SET     puids = puids - 1
-    WHERE   id IN (SELECT album FROM albumjoin WHERE track = OLD.track);
-
-    UPDATE  albummeta
-    SET     puids = puids + 1
-    WHERE   id IN (SELECT album FROM albumjoin WHERE track = NEW.track);
-
-    return NULL;
-end;
-' language 'plpgsql';
---'--
-create or replace function a_del_puidjoin () returns trigger as '
-begin
-    UPDATE  albummeta
-    SET     puids = puids - 1
-    WHERE   id IN (SELECT album FROM albumjoin WHERE track = OLD.track);
-
-    return NULL;
-end;
-' language 'plpgsql';
---'-----------------------------------------------------------------
--- When a moderation closes, move rows from _open to _closed
---'-----------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION after_update_moderation_open () RETURNS TRIGGER AS '
-begin
-
-    if (OLD.status IN (1,8) and NEW.status NOT IN (1,8)) -- STATUS_OPEN, STATUS_TOBEDELETED
-    then
-        -- Create moderation_closed record
-        INSERT INTO moderation_closed SELECT * FROM moderation_open WHERE id = NEW.id;
-        -- and update the closetime
-        UPDATE moderation_closed SET closetime = NOW() WHERE id = NEW.id;
-
-        -- Copy notes
-        INSERT INTO moderation_note_closed
-            SELECT * FROM moderation_note_open
-            WHERE moderation = NEW.id;
-
-        -- Copy votes
-        INSERT INTO vote_closed
-            SELECT * FROM vote_open
-            WHERE moderation = NEW.id;
-
-        -- Delete the _open records
-        DELETE FROM vote_open WHERE moderation = NEW.id;
-        DELETE FROM moderation_note_open WHERE moderation = NEW.id;
-        DELETE FROM moderation_open WHERE id = NEW.id;
-    end if;
-
-    return NEW;
-end;
-' LANGUAGE 'plpgsql';
-
---'-----------------------------------------------------------------
--- Ensure release.releasedate is always valid
---'-----------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION before_insertupdate_release () RETURNS TRIGGER AS '
-DECLARE
-    y CHAR(4);
-    m CHAR(2);
-    d CHAR(2);
-    teststr VARCHAR(10);
-    testdate DATE;
-BEGIN
-    -- Check that the releasedate looks like this: yyyy-mm-dd
-    IF (NOT(NEW.releasedate ~ ''^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$''))
-    THEN
-        RAISE EXCEPTION ''Invalid release date specification'';
-    END IF;
-
-    y := SUBSTR(NEW.releasedate, 1, 4);
-    m := SUBSTR(NEW.releasedate, 6, 2);
-    d := SUBSTR(NEW.releasedate, 9, 2);
-
-    -- Disallow yyyy-00-dd
-    IF (m = ''00'' AND d != ''00'')
-    THEN
-        RAISE EXCEPTION ''Invalid release date specification'';
-    END IF;
-
-    -- Check that the y/m/d combination is valid (e.g. disallow 2003-02-31)
-    IF (m = ''00'') THEN m:= ''01''; END IF;
-    IF (d = ''00'') THEN d:= ''01''; END IF;
-    teststr := ( y || ''-'' || m || ''-'' || d );
-    -- TO_DATE allows 2003-08-32 etc (it becomes 2003-09-01)
-    -- So we will use the ::date cast, which catches this error
-    testdate := teststr;
-
-    RETURN NEW;
-END;
-' LANGUAGE 'plpgsql';
-
---'-----------------------------------------------------------------
--- Maintain albummeta.firstreleasedate
---'-----------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION set_release_group_firstreleasedate(release_group_id INTEGER)
-RETURNS VOID AS $$
-BEGIN
-    UPDATE release_group_meta SET firstreleasedate = (
-        SELECT MIN(firstreleasedate) FROM albummeta, album WHERE album.id = albummeta.id
-           AND release_group = release_group_id AND firstreleasedate <> '0000-00-00' AND firstreleasedate IS NOT NULL
-    ) WHERE id = release_group_id;
-    RETURN;
-END;
-$$ LANGUAGE 'plpgsql';
-
-CREATE OR REPLACE FUNCTION set_album_firstreleasedate(INTEGER)
-RETURNS VOID AS $$
-DECLARE
-    release_group_id INTEGER;
-BEGIN
-    UPDATE albummeta SET firstreleasedate = (
-        SELECT MIN(releasedate) FROM release WHERE album = $1
-           AND releasedate <> '0000-00-00' AND releasedate IS NOT NULL
-    ), lastupdate = now() WHERE id = $1;
-    release_group_id := (SELECT release_group FROM album WHERE id = $1);
-    EXECUTE set_release_group_firstreleasedate(release_group_id);
-    RETURN;
-END;
-$$ LANGUAGE 'plpgsql';
-
-CREATE OR REPLACE FUNCTION a_ins_release () RETURNS TRIGGER AS $$
-BEGIN
-    EXECUTE set_album_firstreleasedate(NEW.album);
-    PERFORM propagate_lastupdate(NEW.id, CAST('release' AS name));
-    RETURN NEW;
-END;
-$$ LANGUAGE 'plpgsql';
-
-CREATE OR REPLACE FUNCTION a_upd_release () RETURNS TRIGGER AS $$
-BEGIN
-    IF (OLD.modpending = NEW.modpending)
-    THEN
-        EXECUTE set_album_firstreleasedate(NEW.album);
-        PERFORM propagate_lastupdate(NEW.id, CAST('release' AS name));
-
-        IF (OLD.album != NEW.album)
-        THEN
-            EXECUTE set_album_firstreleasedate(OLD.album);
-            -- propagate_lastupdate not called since OLD.album is probably
-            -- being merged in NEW.album
-        END IF;
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE 'plpgsql';
-
-CREATE OR REPLACE FUNCTION a_del_release () RETURNS TRIGGER AS $$
-BEGIN
-    EXECUTE set_album_firstreleasedate(OLD.album);
-    RETURN OLD;
-END;
-$$ LANGUAGE 'plpgsql';
-
---'-----------------------------------------------------------------
--- Changes to album_amazon_asin should cause changes to albummeta.asin
---'-----------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION set_album_asin(INTEGER)
-RETURNS VOID AS '
-BEGIN
-    UPDATE albummeta SET coverarturl = (
-        SELECT coverarturl FROM album_amazon_asin WHERE album = $1
-    ), asin = (
-        SELECT asin FROM album_amazon_asin WHERE album = $1
-    ) WHERE id = $1
-        -- Test if album still exists (sanity check)
-        AND EXISTS (SELECT 1 FROM album where id = $1);
-    RETURN;
-END;
-' LANGUAGE 'plpgsql';
-
-CREATE OR REPLACE FUNCTION a_ins_album_amazon_asin () RETURNS TRIGGER AS '
-BEGIN
-    EXECUTE set_album_asin(NEW.album);
-    RETURN NEW;
-END;
-' LANGUAGE 'plpgsql';
-
-CREATE OR REPLACE FUNCTION a_upd_album_amazon_asin () RETURNS TRIGGER AS '
-BEGIN
-    EXECUTE set_album_asin(NEW.album);
-    IF (OLD.album != NEW.album)
-    THEN
-        EXECUTE set_album_asin(OLD.album);
-    END IF;
-    RETURN NEW;
-END;
-' LANGUAGE 'plpgsql';
-
-CREATE OR REPLACE FUNCTION a_del_album_amazon_asin () RETURNS TRIGGER AS '
-BEGIN
-    EXECUTE set_album_asin(OLD.album);
-    RETURN OLD;
-END;
-' LANGUAGE 'plpgsql';
-
---'-----------------------------------------------------------------------------------
--- Changes to puid_stat/puidjoin_stat causes changes to puid.lookupcount/puidjoin.usecount
---'-----------------------------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION a_idu_puid_stat () RETURNS trigger AS '
-BEGIN
-    IF (TG_OP = ''INSERT'' OR TG_OP = ''UPDATE'')
-    THEN
-        UPDATE puid SET lookupcount = (SELECT COALESCE(SUM(puid_stat.lookupcount), 0) FROM puid_stat WHERE puid_id = NEW.puid_id) WHERE id = NEW.puid_id;
-        IF (TG_OP = ''UPDATE'')
-        THEN
-            IF (NEW.puid_id != OLD.puid_id)
-            THEN
-                UPDATE puid SET lookupcount = (SELECT COALESCE(SUM(puid_stat.lookupcount), 0) FROM puid_stat WHERE puid_id = OLD.puid_id) WHERE id = OLD.puid_id;
-            END IF;
-        END IF;
-    ELSE
-        UPDATE puid SET lookupcount = (SELECT COALESCE(SUM(puid_stat.lookupcount), 0) FROM puid_stat WHERE puid_id = OLD.puid_id) WHERE id = OLD.puid_id;
-    END IF;
-
-    RETURN NULL;
-END;
-' LANGUAGE 'plpgsql';
-
-CREATE OR REPLACE FUNCTION a_idu_puidjoin_stat () RETURNS trigger AS '
-BEGIN
-    IF (TG_OP = ''INSERT'' OR TG_OP = ''UPDATE'')
-    THEN
-        UPDATE puidjoin SET usecount = (SELECT COALESCE(SUM(puidjoin_stat.usecount), 0) FROM puidjoin_stat WHERE puidjoin_id = NEW.puidjoin_id) WHERE id = NEW.puidjoin_id;
-        IF (TG_OP = ''UPDATE'')
-        THEN
-            IF (NEW.puidjoin_id != OLD.puidjoin_id)
-            THEN
-                UPDATE puidjoin SET usecount = (SELECT COALESCE(SUM(puidjoin_stat.usecount), 0) FROM puidjoin_stat WHERE puidjoin_id = OLD.puidjoin_id) WHERE id = OLD.puidjoin_id;
-            END IF;
-        END IF;
-    ELSE
-        UPDATE puidjoin SET usecount = (SELECT COALESCE(SUM(puidjoin_stat.usecount), 0) FROM puidjoin_stat WHERE puidjoin_id = OLD.puidjoin_id) WHERE id = OLD.puidjoin_id;
-    END IF;
-
-    RETURN NULL;
-END;
-' LANGUAGE 'plpgsql';
-
---'-----------------------------------------------------------------------------------
--- Maintain Tags refcount
---'-----------------------------------------------------------------------------------
-
-create or replace function a_ins_tag () returns trigger as '
-begin
-    UPDATE  tag
-    SET     refcount = refcount + 1
-    WHERE   id = NEW.tag;
-
-    return NULL;
-end;
-' language 'plpgsql';
-
-create or replace function a_del_tag () returns trigger as '
-declare
-    ref_count integer;
-begin
-
-    SELECT INTO ref_count refcount FROM tag WHERE id = OLD.tag;
-    IF ref_count = 1 THEN
-         DELETE FROM tag WHERE id = OLD.tag;
-    ELSE
-         UPDATE  tag
-         SET     refcount = refcount - 1
-         WHERE   id = OLD.tag;
-    END IF;
-
-    return NULL;
-end;
-' language 'plpgsql';
-
-CREATE OR REPLACE FUNCTION from_hex(t text) RETURNS integer
-    AS $$
-DECLARE
-    r RECORD;
-BEGIN
-    FOR r IN EXECUTE 'SELECT x'''||t||'''::integer AS hex' LOOP
-        RETURN r.hex;
     END LOOP;
-END
-$$ LANGUAGE plpgsql IMMUTABLE STRICT;
-
--- NameSpace_URL = '6ba7b8119dad11d180b400c04fd430c8'
-CREATE OR REPLACE FUNCTION generate_uuid_v3(namespace varchar, name varchar) RETURNS varchar
-    AS $$
-DECLARE
-    value varchar(36);
-    bytes varchar;
-BEGIN
-    bytes = md5(decode(namespace, 'hex') || decode(name, 'escape'));
-    value = substr(bytes, 1+0, 8);
-    value = value || '-';
-    value = value || substr(bytes, 1+2*4, 4);
-    value = value || '-';
-    value = value || lpad(to_hex((from_hex(substr(bytes, 1+2*6, 2)) & 15) | 48), 2, '0');
-    value = value || substr(bytes, 1+2*7, 2);
-    value = value || '-';
-    value = value || lpad(to_hex((from_hex(substr(bytes, 1+2*8, 2)) & 63) | 128), 2, '0');
-    value = value || substr(bytes, 1+2*9, 2);
-    value = value || '-';
-    value = value || substr(bytes, 1+2*10, 12);
-    return value;
+    RETURN res;
 END;
-$$ LANGUAGE 'plpgsql' IMMUTABLE STRICT;
+$$ LANGUAGE 'plpgsql' IMMUTABLE;
 
-CREATE OR REPLACE FUNCTION generate_uuid_v4() RETURNS varchar
+CREATE OR REPLACE FUNCTION page_index_max(txt varchar) RETURNS integer AS $$
+DECLARE
+    input varchar;
+    res integer;
+    i integer;
+    x varchar;
+BEGIN
+    input := regexp_replace(upper(substr(unaccent(txt), 1, 6)), '[^A-Z ]', '_', 'g');
+    res := 0;
+    FOR i IN 1..6 LOOP
+        x := substr(input, i, 1);
+        IF x = '' THEN
+            res := (res << 5) | 31;
+        ELSIF x = '_' THEN
+            res := (res << 5);
+        ELSIF x = ' ' THEN
+            res := (res << 5) | 1;
+        ELSE
+            res := (res << 5) | (ascii(x) - 63);
+        END IF;
+    END LOOP;
+    RETURN res;
+END;
+$$ LANGUAGE 'plpgsql' IMMUTABLE;
+
+
+-- Generates UUID version 4 (random-based)
+CREATE OR REPLACE FUNCTION generate_uuid_v4() RETURNS uuid
     AS $$
 DECLARE
     value VARCHAR(36);
@@ -652,8 +84,451 @@ BEGIN
     value = value || lpad(to_hex(ceil(random() * 255)::int), 2, '0');
     value = value || lpad(to_hex(ceil(random() * 255)::int), 2, '0');
     value = value || lpad(to_hex(ceil(random() * 255)::int), 2, '0');
-    RETURN value;
+    RETURN value::uuid;
 END;
 $$ LANGUAGE 'plpgsql';
 
---'-- vi: set ts=4 sw=4 et :
+CREATE OR REPLACE FUNCTION from_hex(t text) RETURNS integer
+    AS $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN EXECUTE 'SELECT x'''||t||'''::integer AS hex' LOOP
+        RETURN r.hex;
+    END LOOP;
+END
+$$ LANGUAGE plpgsql IMMUTABLE STRICT;
+
+-- NameSpace_URL = '6ba7b8119dad11d180b400c04fd430c8'
+CREATE OR REPLACE FUNCTION generate_uuid_v3(namespace varchar, name varchar) RETURNS uuid
+    AS $$
+DECLARE
+    value varchar(36);
+    bytes varchar;
+BEGIN
+    bytes = md5(decode(namespace, 'hex') || decode(name, 'escape'));
+    value = substr(bytes, 1+0, 8);
+    value = value || '-';
+    value = value || substr(bytes, 1+2*4, 4);
+    value = value || '-';
+    value = value || lpad(to_hex((from_hex(substr(bytes, 1+2*6, 2)) & 15) | 48), 2, '0');
+    value = value || substr(bytes, 1+2*7, 2);
+    value = value || '-';
+    value = value || lpad(to_hex((from_hex(substr(bytes, 1+2*8, 2)) & 63) | 128), 2, '0');
+    value = value || substr(bytes, 1+2*9, 2);
+    value = value || '-';
+    value = value || substr(bytes, 1+2*10, 12);
+    return value::uuid;
+END;
+$$ LANGUAGE 'plpgsql' IMMUTABLE STRICT;
+
+
+CREATE OR REPLACE FUNCTION inc_ref_count(tbl varchar, row_id integer, val integer) RETURNS void AS $$
+BEGIN
+    -- increment ref_count for the new name
+    EXECUTE 'SELECT ref_count FROM ' || tbl || ' WHERE id = ' || row_id || ' FOR UPDATE';
+    EXECUTE 'UPDATE ' || tbl || ' SET ref_count = ref_count + ' || val || ' WHERE id = ' || row_id;
+    RETURN;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION dec_ref_count(tbl varchar, row_id integer, val integer) RETURNS void AS $$
+DECLARE
+    ref_count integer;
+BEGIN
+    -- decrement ref_count for the old name,
+    -- or delete it if ref_count would drop to 0
+    EXECUTE 'SELECT ref_count FROM ' || tbl || ' WHERE id = ' || row_id || ' FOR UPDATE' INTO ref_count;
+    IF ref_count <= val THEN
+        EXECUTE 'DELETE FROM ' || tbl || ' WHERE id = ' || row_id;
+    ELSE
+        EXECUTE 'UPDATE ' || tbl || ' SET ref_count = ref_count - ' || val || ' WHERE id = ' || row_id;
+    END IF;
+    RETURN;
+END;
+$$ LANGUAGE 'plpgsql';
+
+-----------------------------------------------------------------------
+-- artist triggers
+-----------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION a_ins_artist() RETURNS trigger AS $$
+BEGIN
+    -- add a new entry to the artist_meta table
+    INSERT INTO artist_meta (id) VALUES (NEW.id);
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+-----------------------------------------------------------------------
+-- editor triggers
+-----------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION a_ins_editor() RETURNS trigger AS $$
+BEGIN
+    -- add a new entry to the editor_watch_preference table
+    INSERT INTO editor_watch_preferences (editor) VALUES (NEW.id);
+
+    -- by default watch for new official albums
+    INSERT INTO editor_watch_release_group_type (editor, release_group_type)
+        VALUES (NEW.id, 2);
+    INSERT INTO editor_watch_release_status (editor, release_status)
+        VALUES (NEW.id, 1);
+
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+-----------------------------------------------------------------------
+-- label triggers
+-----------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION a_ins_label() RETURNS trigger AS $$
+BEGIN
+    INSERT INTO label_meta (id) VALUES (NEW.id);
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+-----------------------------------------------------------------------
+-- recording triggers
+-----------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION a_ins_recording() RETURNS trigger AS $$
+BEGIN
+    PERFORM inc_ref_count('artist_credit', NEW.artist_credit, 1);
+    INSERT INTO recording_meta (id) VALUES (NEW.id);
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION a_upd_recording() RETURNS trigger AS $$
+BEGIN
+    IF NEW.artist_credit != OLD.artist_credit THEN
+        PERFORM dec_ref_count('artist_credit', OLD.artist_credit, 1);
+        PERFORM inc_ref_count('artist_credit', NEW.artist_credit, 1);
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION a_del_recording() RETURNS trigger AS $$
+BEGIN
+    PERFORM dec_ref_count('artist_credit', OLD.artist_credit, 1);
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+-----------------------------------------------------------------------
+-- release triggers
+-----------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION a_ins_release() RETURNS trigger AS $$
+BEGIN
+    -- increment ref_count of the name
+    PERFORM inc_ref_count('artist_credit', NEW.artist_credit, 1);
+    -- increment release_count of the parent release group
+    UPDATE release_group_meta SET release_count = release_count + 1 WHERE id = NEW.release_group;
+    PERFORM set_release_group_first_release_date(NEW.release_group);
+    -- add new release_meta
+    INSERT INTO release_meta (id) VALUES (NEW.id);
+    INSERT INTO release_coverart (id) VALUES (NEW.id);
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION a_upd_release() RETURNS trigger AS $$
+BEGIN
+    IF NEW.artist_credit != OLD.artist_credit THEN
+        PERFORM dec_ref_count('artist_credit', OLD.artist_credit, 1);
+        PERFORM inc_ref_count('artist_credit', NEW.artist_credit, 1);
+    END IF;
+    IF NEW.release_group != OLD.release_group THEN
+        -- release group is changed, decrement release_count in the original RG, increment in the new one
+        UPDATE release_group_meta SET release_count = release_count - 1 WHERE id = OLD.release_group;
+        UPDATE release_group_meta SET release_count = release_count + 1 WHERE id = NEW.release_group;
+        PERFORM set_release_group_first_release_date(OLD.release_group);
+    END IF;
+    PERFORM set_release_group_first_release_date(NEW.release_group);
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION a_del_release() RETURNS trigger AS $$
+BEGIN
+    -- decrement ref_count of the name
+    PERFORM dec_ref_count('artist_credit', OLD.artist_credit, 1);
+    -- decrement release_count of the parent release group
+    UPDATE release_group_meta SET release_count = release_count - 1 WHERE id = OLD.release_group;
+    PERFORM set_release_group_first_release_date(OLD.release_group);
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+-----------------------------------------------------------------------
+-- release_group triggers
+-----------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION a_ins_release_group() RETURNS trigger AS $$
+BEGIN
+    PERFORM inc_ref_count('artist_credit', NEW.artist_credit, 1);
+    INSERT INTO release_group_meta (id) VALUES (NEW.id);
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION a_upd_release_group() RETURNS trigger AS $$
+BEGIN
+    IF NEW.artist_credit != OLD.artist_credit THEN
+        PERFORM dec_ref_count('artist_credit', OLD.artist_credit, 1);
+        PERFORM inc_ref_count('artist_credit', NEW.artist_credit, 1);
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION a_del_release_group() RETURNS trigger AS $$
+BEGIN
+    PERFORM dec_ref_count('artist_credit', OLD.artist_credit, 1);
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+-----------------------------------------------------------------------
+-- track triggers
+-----------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION a_ins_track() RETURNS trigger AS $$
+BEGIN
+    PERFORM inc_ref_count('artist_credit', NEW.artist_credit, 1);
+    -- increment track_count in the parent tracklist
+    UPDATE tracklist SET track_count = track_count + 1 WHERE id = NEW.tracklist;
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION a_upd_track() RETURNS trigger AS $$
+BEGIN
+    IF NEW.artist_credit != OLD.artist_credit THEN
+        PERFORM dec_ref_count('artist_credit', OLD.artist_credit, 1);
+        PERFORM inc_ref_count('artist_credit', NEW.artist_credit, 1);
+    END IF;
+    IF NEW.tracklist != OLD.tracklist THEN
+        -- tracklist is changed, decrement track_count in the original tracklist, increment in the new one
+        UPDATE tracklist SET track_count = track_count - 1 WHERE id = OLD.tracklist;
+        UPDATE tracklist SET track_count = track_count + 1 WHERE id = NEW.tracklist;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION a_del_track() RETURNS trigger AS $$
+BEGIN
+    PERFORM dec_ref_count('artist_credit', OLD.artist_credit, 1);
+    -- decrement track_count in the parent tracklist
+    UPDATE tracklist SET track_count = track_count - 1 WHERE id = OLD.tracklist;
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+-----------------------------------------------------------------------
+-- work triggers
+-----------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION a_ins_work() RETURNS trigger AS $$
+BEGIN
+    INSERT INTO work_meta (id) VALUES (NEW.id);
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+-----------------------------------------------------------------------
+-- lastupdate triggers
+-----------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION b_upd_last_updated_table() RETURNS trigger AS $$
+BEGIN
+    NEW.last_updated = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
+
+------------------------
+-- CD Lookup
+------------------------
+
+CREATE OR REPLACE FUNCTION create_cube_from_durations(durations INTEGER[]) RETURNS cube AS $$
+DECLARE
+    point    cube;
+    str      VARCHAR;
+    i        INTEGER;
+    count    INTEGER;
+    dest     INTEGER;
+    dim      CONSTANT INTEGER = 6;
+    selected INTEGER[];
+BEGIN
+
+    count = array_upper(durations, 1);
+    FOR i IN 0..dim LOOP
+        selected[i] = 0;
+    END LOOP;
+
+    IF count < dim THEN
+        FOR i IN 1..count LOOP
+            selected[i] = durations[i];
+        END LOOP;
+    ELSE
+        FOR i IN 1..count LOOP
+            dest = (dim * (i-1) / count) + 1;
+            selected[dest] = selected[dest] + durations[i];
+        END LOOP;
+    END IF;
+
+    str = '(';
+    FOR i IN 1..dim LOOP
+        IF i > 1 THEN
+            str = str || ',';
+        END IF;
+        str = str || cast(selected[i] as text);
+    END LOOP;
+    str = str || ')';
+
+    RETURN str::cube;
+END;
+$$ LANGUAGE 'plpgsql' IMMUTABLE;
+
+CREATE OR REPLACE FUNCTION create_bounding_cube(durations INTEGER[], fuzzy INTEGER) RETURNS cube AS $$
+DECLARE
+    point    cube;
+    str      VARCHAR;
+    i        INTEGER;
+    dest     INTEGER;
+    count    INTEGER;
+    dim      CONSTANT INTEGER = 6;
+    selected INTEGER[];
+    scalers  INTEGER[];
+BEGIN
+
+    count = array_upper(durations, 1);
+    IF count < dim THEN
+        FOR i IN 1..dim LOOP
+            selected[i] = 0;
+            scalers[i] = 0;
+        END LOOP;
+        FOR i IN 1..count LOOP
+            selected[i] = durations[i];
+            scalers[i] = 1;
+        END LOOP;
+    ELSE
+        FOR i IN 1..dim LOOP
+            selected[i] = 0;
+            scalers[i] = 0;
+        END LOOP;
+        FOR i IN 1..count LOOP
+            dest = (dim * (i-1) / count) + 1;
+            selected[dest] = selected[dest] + durations[i];
+            scalers[dest] = scalers[dest] + 1;
+        END LOOP;
+    END IF;
+
+    str = '(';
+    FOR i IN 1..dim LOOP
+        IF i > 1 THEN
+            str = str || ',';
+        END IF;
+        str = str || cast((selected[i] - (fuzzy * scalers[i])) as text);
+    END LOOP;
+    str = str || '),(';
+    FOR i IN 1..dim LOOP
+        IF i > 1 THEN
+            str = str || ',';
+        END IF;
+        str = str || cast((selected[i] + (fuzzy * scalers[i])) as text);
+    END LOOP;
+    str = str || ')';
+
+    RETURN str::cube;
+END;
+$$ LANGUAGE 'plpgsql' IMMUTABLE;
+
+
+-------------------------------------------------------------------
+-- Maintain release_group_meta.first_release_date
+-------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION set_release_group_first_release_date(release_group_id INTEGER)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE release_group_meta SET first_release_date_year = first.date_year,
+                                  first_release_date_month = first.date_month,
+                                  first_release_date_day = first.date_day
+      FROM (
+        SELECT date_year, date_month, date_day FROM release
+         WHERE release_group = release_group_id
+      ORDER BY date_year NULLS LAST, date_month NULLS LAST, date_day NULLS LAST
+         LIMIT 1
+           ) AS first WHERE id = release_group_id;
+END;
+$$ LANGUAGE 'plpgsql';
+
+-------------------------------------------------------------------
+-- Find artists that are empty, and have been updated within the
+-- last $interval
+-------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION empty_artists() RETURNS SETOF artist AS
+$BODY$
+DECLARE
+    artist_row artist%rowtype;
+BEGIN
+    FOR artist_row IN
+        SELECT * FROM artist
+        WHERE edits_pending = 0
+    LOOP
+        CONTINUE WHEN
+        (
+            SELECT TRUE FROM artist_credit_name
+             WHERE artist = artist_row.id
+             LIMIT 1
+        ) OR
+        (
+            SELECT TRUE FROM l_artist_recording
+             WHERE entity0 = artist_row.id
+             LIMIT 1
+        ) OR
+        (
+            SELECT TRUE FROM l_artist_work
+             WHERE entity0 = artist_row.id
+             LIMIT 1
+        ) OR
+        (
+            SELECT TRUE FROM l_artist_url
+             WHERE entity0 = artist_row.id
+             LIMIT 1
+        ) OR
+        (
+            SELECT TRUE FROM l_artist_artist
+             WHERE entity0 = artist_row.id OR entity1 = artist_row.id
+             LIMIT 1
+        ) OR
+        (
+            SELECT TRUE FROM l_artist_label
+             WHERE entity0 = artist_row.id
+             LIMIT 1
+        ) OR
+        (
+            SELECT TRUE FROM l_artist_release
+             WHERE entity0 = artist_row.id
+             LIMIT 1
+        ) OR
+        (
+            SELECT TRUE FROM l_artist_release_group WHERE entity0 = artist_row.id
+             LIMIT 1
+        );
+        RETURN NEXT artist_row;
+    END LOOP;
+END
+$BODY$
+LANGUAGE 'plpgsql' ;
+
+COMMIT;
+-- vi: set ts=4 sw=4 et :
