@@ -11,15 +11,15 @@ Installation
    $ createlang plpgsql musicbrainz
 
 2. Prepare empty schema for the MusicBrainz database (skip this if you
-   want to use the default 'public' schema), install the cube extension and
-   create the table structure:
+   want to use the default 'public' schema), install the cube extension into
+   this new schema and create the table structure:
 
    $ echo 'CREATE SCHEMA musicbrainz;' | ./mbslave-psql.py
    $ sed 's/public/musicbrainz/' `pg_config --sharedir`/contrib/cube.sql | ./mbslave-psql.py
    $ ./mbslave-psql.py <sql/CreateTables.sql
 
 3. Download the MusicBrainz database dump files from
-   http://musicbrainz.org/doc/Database_Download
+   http://ftp.musicbrainz.org/pub/musicbrainz/data/ngs/
 
 4. Import the data dumps, for example:
 
