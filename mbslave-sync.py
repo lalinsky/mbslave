@@ -120,9 +120,9 @@ def process_tar(fileobj, db, schema, ignored_tables, expected_schema_seq):
         elif member.name == 'TIMESTAMP':
             ts = tar.extractfile(member).read().strip()
             print ' - Packet was produced at', ts
-        elif member.name == 'mbdump/Pending':
+        elif member.name in ('mbdump/Pending', 'mbdump/dbmirror_pending'):
             importer.load_pending(tar.extractfile(member))
-        elif member.name == 'mbdump/PendingData':
+        elif member.name in ('mbdump/PendingData', 'mbdump/dbmirror_pendingdata'):
             importer.load_pending_data(tar.extractfile(member))
     importer.process()
 
