@@ -11,17 +11,12 @@ Installation
    $ createlang plpgsql musicbrainz
 
 2. Prepare empty schema for the MusicBrainz database (skip this if you
-   want to use the default 'public' schema) and create the table
-   structure:
+   want to use the default 'public' schema), install the cube extension and
+   create the table structure:
 
    $ echo 'CREATE SCHEMA musicbrainz;' | ./mbslave-psql.py
+   $ sed 's/public/musicbrainz/' `pg_config --sharedir`/contrib/cube.sql | ./mbslave-psql.py
    $ ./mbslave-psql.py <sql/CreateTables.sql
-
-   If you are using a newer version of PostgreSQL, you might want to prefer
-   to use the UUID type instead of CHAR(36) to store UUIDs. A simple
-   search/replace will do the trick:
-   
-   $ sed 's/CHAR(36)/UUID/' sql/CreateTables.sql | ./mbslave-psql.py
 
 3. Download the MusicBrainz database dump files from
    http://musicbrainz.org/doc/Database_Download
@@ -33,9 +28,9 @@ Installation
 5. Setup primary keys, indexes, views and functions:
 
    $ ./mbslave-psql.py <sql/CreatePrimaryKeys.sql
-   $ ./mbslave-psql.py <sql/CreateIndexes.sql
-   $ ./mbslave-psql.py <sql/CreateViews.sql
    $ ./mbslave-psql.py <sql/CreateFunctions.sql
+   $ grep -vE '(collate|page_index)' sql/CreateIndexes.sql | ./mbslave-psql.py
+   $ ./mbslave-psql.py <sql/CreateViews.sql
 
 6. Vacuum the newly created database (optional)
 
