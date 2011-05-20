@@ -97,7 +97,7 @@ class PacketImporter(object):
                     params = values.values()
                 if type == 'd' or type == 'u':
                     values = self._data[(id, True)]
-                    sql += ' WHERE ' + ' AND '.join('%s=%%s' % i for i in values.keys())
+                    sql += ' WHERE ' + ' AND '.join('%s%s%%s' % (i, ' IS ' if values[i] is None else '=') for i in values.keys())
                     params.extend(values.values())
                 #print sql, params
                 cursor.execute(sql, params)
