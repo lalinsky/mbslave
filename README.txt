@@ -15,7 +15,7 @@ Installation
    this new schema and create the table structure:
 
    $ echo 'CREATE SCHEMA musicbrainz;' | ./mbslave-psql.py
-   $ sed 's/public/musicbrainz/' `pg_config --sharedir`/contrib/cube.sql | ./mbslave-psql.py
+   $ sed 's/public/musicbrainz/' `pg_config --sharedir`/contrib/cube.sql | psql -U postgres musicbrainz
    $ ./mbslave-psql.py <sql/CreateTables.sql
 
 3. Download the MusicBrainz database dump files from
