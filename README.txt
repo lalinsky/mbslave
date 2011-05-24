@@ -19,7 +19,7 @@ Installation
    $ ./mbslave-psql.py <sql/CreateTables.sql
 
 3. Download the MusicBrainz database dump files from
-   http://ftp.musicbrainz.org/pub/musicbrainz/data/ngs/
+   http://ftp.musicbrainz.org/pub/musicbrainz/data/fullexport/
 
 4. Import the data dumps, for example:
 

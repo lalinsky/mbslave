@@ -6,8 +6,7 @@ user=musicbrainz
 schema=musicbrainz
 
 [MUSICBRAINZ]
-base_url=http://data.ngs.musicbrainz.org
-#base_url=http://ftp.musicbrainz.org/pub/musicbrainz/data/replication/
+base_url=http://ftp.musicbrainz.org/pub/musicbrainz/data/replication/
 
 [TABLES]
 ignore=
