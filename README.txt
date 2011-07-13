@@ -40,8 +40,16 @@ Installation
 
    $ ./mbslave-sync.py
 
-Updating
-========
+Replication
+===========
+
+In order to regularly update your database with the latest changes, setup
+a cron job like this that runs every hour:
+
+15 * * * * $HOME/mbslave/mbslave-sync.py >>/var/log/mbslave.log
+
+Upgrading
+=========
 
 Release 2011-07-13
 ~~~~~~~~~~~~~~~~~~
