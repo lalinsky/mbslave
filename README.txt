@@ -40,3 +40,19 @@ Installation
 
    $ ./mbslave-sync.py
 
+Updating
+========
+
+Release 2011-07-13
+~~~~~~~~~~~~~~~~~~
+
+ $ ./mbslave-psql.py <sql/updates/20110624-cdtoc-indexes.sql
+ $ ./mbslave-psql.py <sql/updates/20110710-tracklist-index-slave-before.sql
+ $ echo "TRUNCATE url_gid_redirect" | ./mbslave-psql.py
+ $ echo "TRUNCATE work_alias" | ./mbslave-psql.py
+ $ curl -O "ftp://data.musicbrainz.org/pub/musicbrainz/data/20110711-update.tar.bz2"
+ $ curl -O "ftp://data.musicbrainz.org/pub/musicbrainz/data/20110711-update-derived.tar.bz2"
+ $ ./mbslave-import.py 20110711-update.tar.bz2 20110711-update-derived.tar.bz2
+ $ ./mbslave-psql.py <sql/updates/20110710-tracklist-index-slave-after.sql
+ $ echo "UPDATE replication_control SET current_schema_sequence = 13, current_replication_sequence = 51420;" | ./mbslave-psql.py
+
