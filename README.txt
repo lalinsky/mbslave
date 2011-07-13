@@ -56,3 +56,16 @@ Release 2011-07-13
  $ ./mbslave-psql.py <sql/updates/20110710-tracklist-index-slave-after.sql
  $ echo "UPDATE replication_control SET current_schema_sequence = 13, current_replication_sequence = 51420;" | ./mbslave-psql.py
 
+Optionally, if you want to integrate tables from the old rawdata database,
+in case they start being replicated in the future, you can also run these
+commands:
+
+ $ ./mbslave-psql.py <sql/vertical/rawdata/CreateTables.sql
+ $ ./mbslave-psql.py <sql/vertical/rawdata/CreateIndexes.sql
+ $ ./mbslave-psql.py <sql/vertical/rawdata/CreatePrimaryKeys.sql
+ $ ./mbslave-psql.py <sql/vertical/rawdata/CreateFunctions.sql
+ $ echo "ALTER TABLE edit_artist ADD status smallint NOT NULL;" | ./mbslave-psql.py
+ $ echo "CREATE INDEX edit_artist_idx_status ON edit_artist (status);" | ./mbslave-psql.py
+ $ echo "ALTER TABLE edit_label ADD status smallint NOT NULL;" | ./mbslave-psql.py
+ $ echo "CREATE INDEX edit_label_idx_status ON edit_label (status);" | ./mbslave-psql.py
+
