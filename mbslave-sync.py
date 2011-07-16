@@ -132,7 +132,7 @@ def download_packet(base_url, replication_seq):
     print "Downloading", url
     try:
         data = urllib2.urlopen(url)
-    except urllib2.URLError, e:
+    except urllib2.HTTPError, e:
         if e.code == 404:
             return None
         raise
