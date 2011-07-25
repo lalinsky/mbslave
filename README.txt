@@ -77,3 +77,23 @@ commands:
  $ echo "ALTER TABLE edit_label ADD status smallint NOT NULL;" | ./mbslave-psql.py
  $ echo "CREATE INDEX edit_label_idx_status ON edit_label (status);" | ./mbslave-psql.py
 
+MySQL Installation
+==================
+
+CREATE USER 'musicbrainz'@'localhost';
+CREATE DATABASE musicbrainz;
+GRANT ALL PRIVILEGES ON musicbrainz.* TO 'musicbrainz'@'localhost';
+
+sed 's/SERIAL/INTEGER/' sql/CreateTables.sql \
+	| sed 's/TIMESTAMP WITH TIME ZONE/TIMESTAMP/' \
+	| sed 's/CUBE/TEXT/' \
+	| sed 's/UUID/CHAR(36)/' \
+	| sed 's/VARCHAR /TEXT /' \
+	| sed 's/INTEGER\[\]/TEXT/' \
+	| sed 's/ release / `release` /' \
+	| sed 's/ DEFAULT NOW()//' \
+	| sed 's/INTERVAL/VARCHAR(100)/' \
+	| sed 's/);/) ENGINE=InnoDB;/' \
+	| grep -v 'ON_ERROR_STOP' \
+	| mysql -u musicbrainz musicbrainz
+
