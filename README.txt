@@ -31,6 +31,7 @@ Installation
    $ ./mbslave-psql.py <sql/CreateFunctions.sql
    $ grep -vE '(collate|page_index)' sql/CreateIndexes.sql | ./mbslave-psql.py
    $ ./mbslave-psql.py <sql/CreateViews.sql
+   $ ./mbslave-psql.py <sql/CreateSimpleViews.sql
 
 6. Vacuum the newly created database (optional)
 
