@@ -1,8 +1,7 @@
 #!/bin/sh
 
-CLONEDIR=/tmp/mbserver-clone
-git clone git://git.musicbrainz.org/musicbrainz-server.git $CLONEDIR
+CLONEDIR="${1:-/tmp/mbserver-clone}"
 rm -rf sql
-mv $CLONEDIR/admin/sql .
-rm -rf $CLONEDIR
-
+[ -z "$1" ] && git clone git://git.musicbrainz.org/musicbrainz-server.git "$CLONEDIR"
+cp -r "$CLONEDIR/admin/sql" .
+[ -z "$1" ] && rm -rf $CLONEDIR
