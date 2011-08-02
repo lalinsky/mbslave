@@ -18,4 +18,6 @@ if config.has_option('DATABASE', 'port'):
 args.append(config.get('DATABASE', 'name'))
 
 os.environ['PGOPTIONS'] = '-c search_path=%s' % config.get('DATABASE', 'schema')
+if config.has_option('DATABASE', 'password'):
+	os.environ['PGPASSWORD'] = config.get('DATABASE', 'password')
 os.execvp("psql", args)
