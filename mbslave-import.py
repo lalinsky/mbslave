@@ -34,6 +34,8 @@ config.read(os.path.dirname(__file__) + '/mbslave.conf')
 opts = {}
 opts['database'] = config.get('DATABASE', 'name')
 opts['user'] = config.get('DATABASE', 'user')
+if config.has_option('DATABASE', 'password'):
+	opts['password'] = config.get('DATABASE', 'password')
 if config.has_option('DATABASE', 'host'):
 	opts['host'] = config.get('DATABASE', 'host')
 if config.has_option('DATABASE', 'port'):
