@@ -1,13 +1,15 @@
 Installation
 ============
 
+0. Make sure you have Python and psycopg2 installed.
+
 1. Setup a database and create mbslave.conf by copying and editing
    mbslave.conf.default. If you are starting completely from scratch,
    you can use the following commands to setup a clean database:
 
    $ sudo su - postgres
    $ createuser musicbrainz
-   $ createdb -O musicbrainz musicbrainz
+   $ createdb createdb -l C -E UTF-8 -T template0 -O musicbrainz musicbrainz
    $ createlang plpgsql musicbrainz
 
 2. Prepare empty schema for the MusicBrainz database (skip this if you
@@ -15,7 +17,7 @@ Installation
    this new schema and create the table structure:
 
    $ echo 'CREATE SCHEMA musicbrainz;' | ./mbslave-psql.py
-   $ sed 's/public/musicbrainz/' `pg_config --sharedir`/contrib/cube.sql | psql -U postgres musicbrainz
+   $ sed 's/public/musicbrainz/' /usr/share/postgresql/9.0/contrib/cube.sql | psql -U postgres musicbrainz
    $ ./mbslave-psql.py <sql/CreateTables.sql
 
 3. Download the MusicBrainz database dump files from
