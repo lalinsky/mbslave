@@ -9,7 +9,7 @@ Installation
 
    $ sudo su - postgres
    $ createuser musicbrainz
-   $ createdb createdb -l C -E UTF-8 -T template0 -O musicbrainz musicbrainz
+   $ createdb -l C -E UTF-8 -T template0 -O musicbrainz musicbrainz
    $ createlang plpgsql musicbrainz
 
 2. Prepare empty schema for the MusicBrainz database (skip this if you
