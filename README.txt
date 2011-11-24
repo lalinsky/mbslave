@@ -16,7 +16,7 @@ Installation
    want to use the default 'public' schema), install the cube extension into
    this new schema and create the table structure:
 
-   $ echo 'CREATE SCHEMA musicbrainz;' | ./mbslave-psql.py
+   $ echo 'CREATE SCHEMA musicbrainz;' | ./mbslave-psql.py -S
    $ sed 's/public/musicbrainz/' /usr/share/postgresql/9.0/contrib/cube.sql | psql -U postgres musicbrainz
    $ ./mbslave-psql.py <sql/CreateTables.sql
 
