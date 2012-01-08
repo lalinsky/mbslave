@@ -19,6 +19,11 @@ Installation
    $ echo 'CREATE SCHEMA musicbrainz;' | ./mbslave-psql.py -S
    $ sed 's/public/musicbrainz/' /usr/share/postgresql/9.0/contrib/cube.sql | psql -U postgres musicbrainz
    $ ./mbslave-psql.py <sql/CreateTables.sql
+  
+   Note: If you are using PostgreSQL 9.1 or newer, use this command to
+   install the cube extension:
+
+   $ echo 'CREATE EXTENSION cube WITH SCHEMA musicbrainz;' | psql -U postgres musicbrainz
 
 3. Download the MusicBrainz database dump files from
    http://ftp.musicbrainz.org/pub/musicbrainz/data/fullexport/
@@ -27,12 +32,10 @@ Installation
 
    $ ./mbslave-import.py mbdump.tar.bz2 mbdump-derived.tar.bz2
 
-5. Setup primary keys, indexes, views and functions:
+5. Setup primary keys, indexes and views:
 
    $ ./mbslave-psql.py <sql/CreatePrimaryKeys.sql
-   $ ./mbslave-psql.py <sql/CreateFunctions.sql
    $ grep -vE '(collate|page_index)' sql/CreateIndexes.sql | ./mbslave-psql.py
-   $ ./mbslave-psql.py <sql/CreateViews.sql
    $ ./mbslave-psql.py <sql/CreateSimpleViews.sql
 
 6. Vacuum the newly created database (optional)
