@@ -83,3 +83,9 @@ commands:
  $ echo "ALTER TABLE edit_label ADD status smallint NOT NULL;" | ./mbslave-psql.py
  $ echo "CREATE INDEX edit_label_idx_status ON edit_label (status);" | ./mbslave-psql.py
 
+Release 2012-01-12
+~~~~~~~~~~~~~~~~~~
+
+ $ ./mbslave-psql.py <sql/updates/20120105-caa-flag.sql
+ $ echo "UPDATE replication_control SET current_schema_sequence = 14;" | ./mbslave-psql.py
+
