@@ -64,7 +64,7 @@ user to user.
 ## Replication
 
 After the initial database setup, you might want to update the database with the latest data.
-The `mbslave-sync.py` will fetch updates from MusicBrainz and apply it to your local database:
+The `mbslave-sync.py` script will fetch updates from MusicBrainz and apply it to your local database:
 
 ```sh
 ./mbslave-sync.py
