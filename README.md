@@ -8,9 +8,9 @@ user to user.
 
 ## Installation
 
- 0. Make sure you have Python and psycopg2 installed.
+ 0. Make sure you have [Python](http://python.org/) and [psycopg2](http://initd.org/psycopg/) installed.
 
- 1. Setup a database and create mbslave.conf by copying and editing
+ 1. Setup a database and create `mbslave.conf` by copying and editing
     mbslave.conf.default. If you are starting completely from scratch,
     you can use the following commands to setup a clean database:
 
@@ -22,7 +22,7 @@ user to user.
     ```
 
  2. Prepare empty schema for the MusicBrainz database (skip this if you
-    want to use the default 'public' schema), install the cube extension into
+    want to use the default `public` schema), install the `cube` extension into
     this new schema and create the table structure:
 
     ```sh
