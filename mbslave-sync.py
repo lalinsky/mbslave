@@ -9,6 +9,7 @@ import re
 import urllib2
 import shutil
 import tempfile
+from mbslave import Config, ReplicationHook, connect_db
 
 
 def parse_data_fields(s):
@@ -48,12 +49,14 @@ def read_psql_dump(fp, types):
 
 class PacketImporter(object):
 
-    def __init__(self, db, schema, ignored_tables):
+    def __init__(self, db, schema, ignored_tables, replication_seq, hook):
         self._db = db
         self._data = {}
         self._transactions = {}
         self._schema = schema
         self._ignored_tables = ignored_tables
+        self._hook = hook
+        self._replication_seq = replication_seq
 
     def load_pending_data(self, fp):
         dump = read_psql_dump(fp, [int, parse_bool, parse_data_fields])
@@ -70,6 +73,7 @@ class PacketImporter(object):
     def process(self):
         cursor = self._db.cursor()
         stats = {}
+        self._hook.begin(self._replication_seq)
         for xid in sorted(self._transactions.keys()):
             transaction = self._transactions[xid]
             #print ' - Running transaction', xid
@@ -81,37 +85,47 @@ class PacketImporter(object):
                 if fulltable not in stats:
                     stats[fulltable] = {'d': 0, 'u': 0, 'i': 0}
                 stats[fulltable][type] += 1
+                keys = self._data.get((id, True), {})
+                values = self._data.get((id, False), {})
                 if type == 'd':
                     sql = 'DELETE FROM %s' % (fulltable,)
                     params = []
+                    self._hook.before_delete(table, keys)
                 elif type == 'u':
-                    values = self._data[(id, False)]
                     sql_values = ', '.join('%s=%%s' % i for i in values)
                     sql = 'UPDATE %s SET %s' % (fulltable, sql_values)
                     params = values.values()
+                    self._hook.before_update(table, keys, values)
                 elif type == 'i':
-                    values = self._data[(id, False)]
                     sql_columns = ', '.join(values.keys())
                     sql_values = ', '.join(['%s'] * len(values))
                     sql = 'INSERT INTO %s (%s) VALUES (%s)' % (fulltable, sql_columns, sql_values)
                     params = values.values()
+                    self._hook.before_insert(table, values)
                 if type == 'd' or type == 'u':
-                    values = self._data[(id, True)]
-                    sql += ' WHERE ' + ' AND '.join('%s%s%%s' % (i, ' IS ' if values[i] is None else '=') for i in values.keys())
-                    params.extend(values.values())
+                    sql += ' WHERE ' + ' AND '.join('%s%s%%s' % (i, ' IS ' if keys[i] is None else '=') for i in keys.keys())
+                    params.extend(keys.values())
                 #print sql, params
                 cursor.execute(sql, params)
+                if type == 'd':
+                    self._hook.after_delete(table, keys)
+                elif type == 'u':
+                    self._hook.after_update(table, keys, values)
+                elif type == 'i':
+                    self._hook.after_insert(table, values)
             #print 'COMMIT; --', xid
         print ' - Statistics:'
         for table in sorted(stats.keys()):
             print '   * %-30s\t%d\t%d\t%d' % (table, stats[table]['i'], stats[table]['u'], stats[table]['d'])
+        self._hook.before_commit()
         self._db.commit()
+        self._hook.after_commit()
 
 
-def process_tar(fileobj, db, schema, ignored_tables, expected_schema_seq):
+def process_tar(fileobj, db, schema, ignored_tables, expected_schema_seq, replication_seq, hook):
     print "Processing", fileobj.name
     tar = tarfile.open(fileobj=fileobj, mode='r:bz2')
-    importer = PacketImporter(db, schema, ignored_tables)
+    importer = PacketImporter(db, schema, ignored_tables, replication_seq, hook)
     for member in tar:
         if member.name == 'SCHEMA_SEQUENCE':
             schema_seq = int(tar.extractfile(member).read().strip())
@@ -142,23 +156,18 @@ def download_packet(base_url, replication_seq):
     tmp.seek(0)
     return tmp
 
-config = ConfigParser.RawConfigParser()
-config.read(os.path.dirname(__file__) + '/mbslave.conf')
-
-opts = {}
-opts['database'] = config.get('DATABASE', 'name')
-opts['user'] = config.get('DATABASE', 'user')
-if config.has_option('DATABASE', 'password'):
-	opts['password'] = config.get('DATABASE', 'password')
-if config.has_option('DATABASE', 'host'):
-	opts['host'] = config.get('DATABASE', 'host')
-if config.has_option('DATABASE', 'port'):
-	opts['port'] = config.get('DATABASE', 'port')
-db = psycopg2.connect(**opts)
+config = Config(os.path.dirname(__file__) + '/mbslave.conf')
+db = connect_db(config)
 
 schema = config.get('DATABASE', 'schema')
 base_url = config.get('MUSICBRAINZ', 'base_url')
 ignored_tables = set(config.get('TABLES', 'ignore').split(','))
+
+if config.solr.enabled:
+    from mbslave.search import SolrReplicationHook
+    hook_class = SolrReplicationHook
+else:
+    hook_class = ReplicationHook
 
 cursor = db.cursor()
 cursor.execute("SELECT current_schema_sequence, current_replication_sequence FROM %s.replication_control" % schema)
@@ -166,10 +175,11 @@ schema_seq, replication_seq = cursor.fetchone()
 
 while True:
     replication_seq += 1
+    hook = hook_class(config, db, schema)
     tmp = download_packet(base_url, replication_seq)
     if tmp is None:
         print 'Not found, stopping'
         break
-    process_tar(tmp, db, schema, ignored_tables, schema_seq)
+    process_tar(tmp, db, schema, ignored_tables, schema_seq, replication_seq, hook)
     tmp.close()
 
