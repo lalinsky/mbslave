@@ -118,3 +118,18 @@ echo "CREATE INDEX edit_label_idx_status ON edit_label (status);" | ./mbslave-ps
 echo "UPDATE replication_control SET current_schema_sequence = 14;" | ./mbslave-psql.py
 ```
 
+## Solr Search Index (Work-In-Progress)
+
+If you would like to also build a Solr index for searching, mbslave includes a script to
+export the MusicBrainz into XML file that you can feed to Solr:
+
+    ./mbslave-solr-export.py >/tmp/mbsolr.xml
+
+Once you have generated this file, you for example start a local instance of Solr:
+
+    java -Dsolr.solr.home=/path/to/mbslave/solr/ -jar start.jar
+
+And tell it to import the XML file:
+
+    curl http://localhost:8983/solr/update -F stream.file=/tmp/mbsolr.xml -F commit=true
+

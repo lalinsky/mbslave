@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<solr persistent="false">
+	<cores adminPath="/admin/cores" defaultCoreName="musicbrainz">
+		<core name="musicbrainz" instanceDir="." />
+	</cores>
+</solr>
+

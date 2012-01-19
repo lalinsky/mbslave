@@ -1,0 +1,68 @@
+<?xml version="1.0" ?>
+<schema name="MusicBrainz" version="1.1">
+
+	<types>
+		<fieldtype name="string"  class="solr.StrField" sortMissingLast="true" omitNorms="true"/>
+		<fieldType name="text" class="solr.TextField" positionIncrementGap="100">
+			<analyzer type="index">
+				<tokenizer class="solr.StandardTokenizerFactory"/>
+				<filter class="solr.LowerCaseFilterFactory"/>
+			</analyzer>
+			<analyzer type="query">
+				<tokenizer class="solr.StandardTokenizerFactory"/>
+				<filter class="solr.LowerCaseFilterFactory"/>
+			</analyzer>
+		</fieldType>
+	</types>
+
+	<fields>   
+
+		<!--
+		Type of the entity this document stores. Can be one of:
+			- artist
+			- label
+			- release
+			- releasegroup
+			- recording
+			- work
+		-->
+		<field name="kind" type="string" indexed="true" stored="true" required="true" />
+
+		<!-- For most entity types, it's just the MBID. It must uniquely identify the document. -->
+		<field name="id" type="string" indexed="true" stored="true" required="true" />
+
+		<!-- Artist name, label name, release group title, recording or recording title. -->
+		<field name="name" type="text" indexed="true" />
+
+		<!-- Only used for release groups, releases and recordings. -->
+		<field name="artist" type="text" indexed="true" multiValued="true" />
+
+		<!-- Artist type, label type, work type. -->
+		<field name="type" type="text" indexed="true" />
+
+		<!-- Release status. -->
+		<field name="status" type="text" indexed="true" />
+
+		<!-- Gender. Applicable for: artist. -->
+		<field name="gender" type="text" indexed="true" />
+
+		<!-- IPI code. Applicable for: artist, label. -->
+		<field name="ipi" type="text" indexed="true" />
+
+		<!-- Label code. Applicable for: label. -->
+		<field name="code" type="text" indexed="true" />
+
+		<!-- Barcode. Applicable for: release. -->
+		<field name="barcode" type="text" indexed="true" />
+
+		<!-- Country name or ISO code. Applicable for: artist, label, release. -->
+		<field name="country" type="text" indexed="true" multiValued="true" />
+
+	</fields>
+
+	<uniqueKey>id</uniqueKey>
+	<defaultSearchField>name</defaultSearchField>
+	<solrQueryParser defaultOperator="OR" />
+
+</schema>
+
