@@ -13,3 +13,12 @@ base_url=http://ftp.musicbrainz.org/pub/musicbrainz/data/replication/
 ignore=
 #ignore=albumwords,trackwords,artistwords,labelwords,wordlist,puid,puidjoin,trm,trmjoin
 
+[solr]
+enabled=no
+url=http://localhost:8983/solr/musicbrainz/
+index_artists=yes
+index_labels=yes
+index_releases=yes
+index_release_groups=yes
+index_works=yes
+

@@ -4,6 +4,27 @@ import ConfigParser
 class ConfigSection(object):
     pass
 
+class SolrConfig(object):
+
+    def __init__(self):
+        self.enabled = False
+        self.url = 'http://localhost:8983/solr/musicbrainz'
+        self.index_artists = True
+        self.index_labels = True
+        self.index_releases = True
+        self.index_release_groups = True
+        self.index_works = True
+
+    def parse(self, parser, section):
+        if parser.has_option(section, 'enabled'):
+            self.enabled = parser.getboolean(section, 'enabled')
+        if parser.has_option(section, 'url'):
+            self.url = parser.get(section, 'url')
+        for name in ('artists', 'labels', 'releases', 'release_groups', 'works'):
+            key = 'index_%s' % name
+            if parser.has_option(section, key):
+                setattr(self, key, parser.getboolean(section, key))
+
 
 class Config(object):
 
@@ -15,6 +36,9 @@ class Config(object):
         self.has_option = self.cfg.has_option
         self.database = ConfigSection()
         self.database.schema = self.cfg.get('DATABASE', 'schema')
+        self.solr = SolrConfig()
+        if self.cfg.has_section('solr'):
+            self.solr.parse(self.cfg, 'solr')
 
     def make_psql_args(self):
         opts = {}
