@@ -123,7 +123,7 @@ echo "UPDATE replication_control SET current_schema_sequence = 14;" | ./mbslave-
 If you would like to also build a Solr index for searching, mbslave includes a script to
 export the MusicBrainz into XML file that you can feed to Solr:
 
-    ./mbslave-solr-export.py >/tmp/mbsolr.xml
+    ./mbslave-solr-export.py >/tmp/solr-data.xml
 
 Once you have generated this file, you for example start a local instance of Solr:
 
@@ -131,5 +131,5 @@ Once you have generated this file, you for example start a local instance of Sol
 
 And tell it to import the XML file:
 
-    curl http://localhost:8983/solr/update -F stream.file=/tmp/mbsolr.xml -F commit=true
+    curl http://localhost:8983/solr/musicbrainz/update -F stream.file=/tmp/solr-data.xml -F commit=true
 

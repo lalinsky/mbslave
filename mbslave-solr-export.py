@@ -26,7 +26,6 @@ def fetch_artists():
         LEFT JOIN country c ON a.country=c.id
         LEFT JOIN gender g ON a.gender=g.id
         ORDER BY a.id
-        LIMIT 10
     """
     cursor = db.cursor()
     cursor.execute(query)
@@ -63,7 +62,6 @@ def fetch_labels():
         LEFT JOIN label_type lt ON l.type=lt.id
         LEFT JOIN country c ON l.country=c.id
         ORDER BY l.id
-        LIMIT 10
     """
     cursor = db.cursor()
     cursor.execute(query)
@@ -98,7 +96,6 @@ def fetch_release_groups():
         JOIN artist_name an ON ac.name = an.id
         LEFT JOIN release_group_type rgt ON rg.type = rgt.id
         ORDER BY rg.id
-        LIMIT 10
     """
     cursor = db.cursor()
     cursor.execute(query)
@@ -131,7 +128,6 @@ def fetch_releases():
         LEFT JOIN release_group_type rgt ON rg.type = rgt.id
         LEFT JOIN release_status rs ON r.status = rs.id
         ORDER BY r.id
-        LIMIT 10
     """
     cursor = db.cursor()
     cursor.execute(query)
