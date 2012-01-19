@@ -5,7 +5,7 @@ import itertools
 from lxml import etree as ET
 from lxml.builder import E
 from mbslave import Config, connect_db
-from mbslave.replication import fetch_all
+from mbslave.search import fetch_all
 
 cfg = Config(os.path.join(os.path.dirname(__file__), 'mbslave.conf'))
 db = connect_db(cfg)

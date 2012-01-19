@@ -1,3 +1,4 @@
+import itertools
 import urllib2
 from lxml import etree as ET
 from lxml.builder import E
