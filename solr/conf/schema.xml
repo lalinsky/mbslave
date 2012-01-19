@@ -49,6 +49,12 @@
 		<!-- IPI code. Applicable for: artist, label. -->
 		<field name="ipi" type="text" indexed="true" />
 
+		<!-- ISWC code. Applicable for: work. -->
+		<field name="iswc" type="text" indexed="true" />
+
+		<!-- ISRC code. Applicable for: recording. -->
+		<field name="isrc" type="text" indexed="true" multiValued="true" />
+
 		<!-- Label code. Applicable for: label. -->
 		<field name="code" type="text" indexed="true" />
 

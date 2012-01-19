@@ -147,12 +147,40 @@ def fetch_releases():
         yield E.doc(*fields)
 
 
+def fetch_works():
+    query = """
+        SELECT
+            w.gid,
+            wn.name,
+            wt.name,
+            w.iswc
+        FROM work w
+        JOIN work_name wn ON w.name = wn.id
+        LEFT JOIN work_type wt ON w.type = wt.id
+        ORDER BY w.id
+    """
+    cursor = db.cursor()
+    cursor.execute(query)
+    for gid, name, type, iswc in cursor:
+        fields = [
+            E.field('work', name='kind'),
+            E.field(gid, name='id'),
+            E.field(name.decode('utf8'), name='name'),
+        ]
+        if type:
+            fields.append(E.field(type.decode('utf8'), name='type'))
+        if iswc:
+            fields.append(E.field(iswc, name='iswc'))
+        yield E.doc(*fields)
+
+
 def fetch_all():
     return itertools.chain(
-        fetch_releases(),
-        fetch_release_groups(),
-        fetch_artists(),
-        fetch_labels())
+        fetch_works() if cfg.solr.index_works else [],
+        fetch_releases() if cfg.solr.index_releases else [],
+        fetch_release_groups() if cfg.solr.index_release_groups else [],
+        fetch_artists() if cfg.solr.index_artists else [],
+        fetch_labels() if cfg.solr.index_labels else [])
 
 
 print '<add>'
