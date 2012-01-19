@@ -10,12 +10,13 @@ schema=musicbrainz
 base_url=http://ftp.musicbrainz.org/pub/musicbrainz/data/replication/
 
 [TABLES]
-ignore=
-#ignore=albumwords,trackwords,artistwords,labelwords,wordlist,puid,puidjoin,trm,trmjoin
+ignore
+#ignore=tracklist_index
 
 [solr]
 enabled=no
 url=http://localhost:8983/solr/musicbrainz/
+update_queue=./solr/queue
 index_artists=yes
 index_labels=yes
 index_releases=yes

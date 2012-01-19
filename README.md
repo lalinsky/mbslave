@@ -22,20 +22,11 @@ user to user.
     ```
 
  2. Prepare empty schema for the MusicBrainz database (skip this if you
-    want to use the default `public` schema), install the `cube` extension into
-    this new schema and create the table structure:
+    want to use the default `public` schema) and create the table structure:
 
     ```sh
     echo 'CREATE SCHEMA musicbrainz;' | ./mbslave-psql.py -S
-    sed 's/public/musicbrainz/' /usr/share/postgresql/9.0/contrib/cube.sql | psql -U postgres musicbrainz
-    ./mbslave-psql.py <sql/CreateTables.sql
-    ```
-  
-    **Note:** If you are using PostgreSQL 9.1 or newer, use this command to
-    install the cube extension:
-
-    ```sh
-    echo 'CREATE EXTENSION cube WITH SCHEMA musicbrainz;' | psql -U postgres musicbrainz
+    sed 's/CUBE/TEXT/' sql/CreateTables.sql | ./mbslave-psql.py
     ```
 
  3. Download the MusicBrainz database dump files from
@@ -51,7 +42,7 @@ user to user.
 
     ```sh
     ./mbslave-psql.py <sql/CreatePrimaryKeys.sql
-    grep -vE '(collate|page_index)' sql/CreateIndexes.sql | ./mbslave-psql.py
+    grep -vE '(collate|page_index|tracklist_index)' sql/CreateIndexes.sql | ./mbslave-psql.py
     ./mbslave-psql.py <sql/CreateSimpleViews.sql
     ```
 
