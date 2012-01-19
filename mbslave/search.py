@@ -207,19 +207,26 @@ class SolrReplicationHook(ReplicationHook):
         self.added = set()
         self.seq = seq
 
+    def add_update(self, table, id):
+        key = table, id
+        if key in self.deleted:
+            del self.deleted[key]
+        self.added.add(key)
+
     def after_insert(self, table, values):
         if table in ('artist', 'label', 'release', 'release_group', 'work'):
-            key = table, values['id']
-            if key in self.deleted:
-                del self.deleted[key]
-            self.added.add(key)
+            self.add_update(table, values['id'])
 
     def after_update(self, table, keys, values):
         if table in ('artist', 'label', 'release', 'release_group', 'work'):
-            key = table, keys['id']
-            if key in self.deleted:
-                del self.deleted[key]
-            self.added.add(key)
+            id = keys['id']
+            self.add_update(table, id)
+            if table == 'release_group':
+                cursor = self.db.cursor()
+                cursor.execute("SELECT id FROM %s.release WHERE release_group = %%s" % (self.schema,), (id,))
+                for release_id, in cursor:
+                    self.add_update('release', release_id)
+
 
     def before_delete(self, table, keys):
         if table in ('artist', 'label', 'release', 'release_group', 'work'):
