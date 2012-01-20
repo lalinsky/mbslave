@@ -10,16 +10,16 @@ def placeholders(ids):
     return ", ".join(["%s" for i in ids])
 
 
-def iter_artist_aliases(db, ids=()):
+def iter_aliases(db, entity, ids=()):
     query = """
-        SELECT a.artist, an.name
-        FROM artist_alias a
-        JOIN artist_name an ON a.name=an.id
-    """
+        SELECT a.%(entity)s, an.name
+        FROM %(entity)s_alias a
+        JOIN %(entity)s_name an ON a.name=an.id
+    """ % dict(entity=entity)
     if ids:
         ids = tuple(set(ids))
-        query += " WHERE a.artist IN (%s)" % placeholders(ids)
-    query += " ORDER BY a.artist"
+        query += " WHERE a.%s IN (%s)" % (entity, placeholders(ids))
+    query += " ORDER BY a.%s" % (entity,)
     cursor = db.cursor()
     cursor.execute(query, ids)
     last_id = None
@@ -90,8 +90,13 @@ def add_country_fields(fields, name, code):
         fields.append(E.field('UK', name='country'))
 
 
+def add_alias_fields(fields, aliases):
+    for alias in aliases:
+        fields.append(E.field(alias.decode('utf8'), name='alias'))
+
+
 def fetch_artists(db, ids=()):
-    iter = merge(iter_artists(db, ids), iter_artist_aliases(db, ids))
+    iter = merge(iter_artists(db, ids), iter_aliases(db, 'artist', ids))
     for row in iter:
         fields = [
             E.field('artist', name='kind'),
@@ -110,23 +115,26 @@ def fetch_artists(db, ids=()):
         if row['country']:
             add_country_fields(fields, row['country'], row['country_code'])
         if 'aliases' in row and row['aliases']:
-            for alias in row['aliases']:
-                fields.append(E.field(alias.decode('utf8'), name='alias'))
+            add_alias_fields(fields, row['aliases'])
         yield E.doc(*fields)
 
 
-def fetch_labels(db, ids=()):
+def iter_labels(db, ids=()):
     query = """
         SELECT
-            l.gid,
-            ln.name,
-            lt.name,
-            c.name,
-            c.iso_code,
-            l.ipi_code,
-            l.label_code
+            l.id AS _id,
+            l.gid AS id,
+            l.comment AS disambiguation,
+            ln.name AS name,
+            lsn.name AS sortname,
+            lt.name AS type,
+            c.name AS country,
+            c.iso_code AS country_code,
+            l.ipi_code AS ipi,
+            l.label_code AS code
         FROM label l
         JOIN label_name ln ON l.name=ln.id
+        JOIN label_name lsn ON l.sort_name=lsn.id
         LEFT JOIN label_type lt ON l.type=lt.id
         LEFT JOIN country c ON l.country=c.id
     """
@@ -134,24 +142,33 @@ def fetch_labels(db, ids=()):
         ids = tuple(set(ids))
         query += " WHERE l.id IN (%s)" % placeholders(ids)
     query += " ORDER BY l.id"
-    cursor = db.cursor()
+    cursor = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
     cursor.execute(query, ids)
-    for gid, name, type, country_name, country_iso_code, ipi_code, label_code in cursor:
+    return cursor
+
+
+def fetch_labels(db, ids=()):
+    iter = merge(iter_labels(db, ids), iter_aliases(db, 'label', ids))
+    for row in iter:
         fields = [
             E.field('label', name='kind'),
-            E.field(gid, name='id'),
-            E.field(name.decode('utf8'), name='name'),
+            E.field(row['id'], name='id'),
+            E.field(row['name'].decode('utf8'), name='name'),
+            E.field(row['sortname'].decode('utf8'), name='sortname'),
         ]
-        if type:
-            fields.append(E.field(type, name='type'))
-        if ipi_code:
-            fields.append(E.field(ipi_code, name='ipi'))
-        if label_code:
-            fields.append(E.field('LC-%04d' % label_code, name='code'))
-            fields.append(E.field('LC%04d' % label_code, name='code'))
-        if country_name:
-            fields.append(E.field(country_name.decode('utf8'), name='country'))
-            fields.append(E.field(country_iso_code, name='country'))
+        if row['disambiguation']:
+            fields.append(E.field(row['disambiguation'].decode('utf8'), name='disambiguation'))
+        if row['type']:
+            fields.append(E.field(row['type'], name='type'))
+        if row['ipi']:
+            fields.append(E.field(row['ipi'].decode('utf8'), name='ipi'))
+        if row['country']:
+            add_country_fields(fields, row['country'], row['country_code'])
+        if row['code']:
+            fields.append(E.field('LC-%04d' % row['code'], name='code'))
+            fields.append(E.field('LC%04d' % row['code'], name='code'))
+        if 'aliases' in row and row['aliases']:
+            add_alias_fields(fields, row['aliases'])
         yield E.doc(*fields)
 
 
@@ -285,6 +302,8 @@ class SolrReplicationHook(ReplicationHook):
             self.add_update(table, values['id'])
         elif table == 'artist_alias':
             self.add_update('artist', values['artist'])
+        elif table == 'label_alias':
+            self.add_update('label', values['label'])
 
     def after_update(self, table, keys, values):
         if table in ('artist', 'label', 'release', 'release_group', 'work'):
@@ -297,6 +316,8 @@ class SolrReplicationHook(ReplicationHook):
                     self.add_update('release', release_id)
         elif table == 'artist_alias':
             self.add_update('artist', values['artist'])
+        elif table == 'label_alias':
+            self.add_update('label', values['label'])
 
     def before_delete(self, table, keys):
         if table in ('artist', 'label', 'release', 'release_group', 'work'):
@@ -313,6 +334,11 @@ class SolrReplicationHook(ReplicationHook):
             cursor.execute("SELECT artist FROM %s.artist_alias WHERE id = %%s" % (self.schema,), (id,))
             for artist_id, in cursor:
                 self.add_update('artist', artist_id)
+        elif table == 'label_alias':
+            cursor = self.db.cursor()
+            cursor.execute("SELECT label FROM %s.label_alias WHERE id = %%s" % (self.schema,), (id,))
+            for label_id, in cursor:
+                self.add_update('label', label_id)
 
 
     def after_commit(self):
