@@ -65,7 +65,7 @@
 		<field name="isrc" type="text" indexed="true" multiValued="true" />
 
 		<!-- Label code. Applicable for: label. -->
-		<field name="code" type="text" indexed="true" />
+		<field name="code" type="text" indexed="true" multiValued="true" />
 
 		<!-- Barcode. Applicable for: release. -->
 		<field name="barcode" type="text" indexed="true" />
