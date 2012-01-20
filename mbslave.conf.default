@@ -21,5 +21,6 @@ index_artists=yes
 index_labels=yes
 index_releases=yes
 index_release_groups=yes
+index_recordings=yes
 index_works=yes
 

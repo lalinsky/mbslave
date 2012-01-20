@@ -203,6 +203,33 @@ def fetch_release_groups(db, ids=()):
         yield E.doc(*fields)
 
 
+def fetch_recordings(db, ids=()):
+    query = """
+        SELECT
+            r.gid,
+            rn.name,
+            an.name
+        FROM recording r
+        JOIN track_name rn ON r.name = rn.id
+        JOIN artist_credit ac ON r.artist_credit = ac.id
+        JOIN artist_name an ON ac.name = an.id
+    """
+    if ids:
+        ids = tuple(set(ids))
+        query += " WHERE r.id IN (%s)" % placeholders(ids)
+    query += " ORDER BY r.id"
+    cursor = db.cursor()
+    cursor.execute(query, ids)
+    for gid, name, artist in cursor:
+        fields = [
+            E.field('recording', name='kind'),
+            E.field(gid, name='id'),
+            E.field(name.decode('utf8'), name='name'),
+            E.field(artist.decode('utf8'), name='artist'),
+        ]
+        yield E.doc(*fields)
+
+
 def fetch_releases(db, ids=()):
     query = """
         SELECT
@@ -275,6 +302,7 @@ def fetch_works(db, ids=()):
 def fetch_all(cfg, db):
     return itertools.chain(
         fetch_works(db) if cfg.solr.index_works else [],
+        fetch_recordings(db) if cfg.solr.index_recordings else [],
         fetch_releases(db) if cfg.solr.index_releases else [],
         fetch_release_groups(db) if cfg.solr.index_release_groups else [],
         fetch_artists(db) if cfg.solr.index_artists else [],
@@ -298,7 +326,7 @@ class SolrReplicationHook(ReplicationHook):
         self.added.add(key)
 
     def after_insert(self, table, values):
-        if table in ('artist', 'label', 'release', 'release_group', 'work'):
+        if table in ('artist', 'label', 'release', 'release_group', 'recording', 'work'):
             self.add_update(table, values['id'])
         elif table == 'artist_alias':
             self.add_update('artist', values['artist'])
@@ -306,7 +334,7 @@ class SolrReplicationHook(ReplicationHook):
             self.add_update('label', values['label'])
 
     def after_update(self, table, keys, values):
-        if table in ('artist', 'label', 'release', 'release_group', 'work'):
+        if table in ('artist', 'label', 'release', 'release_group', 'recording', 'work'):
             id = keys['id']
             self.add_update(table, id)
             if table == 'release_group':
@@ -320,7 +348,7 @@ class SolrReplicationHook(ReplicationHook):
             self.add_update('label', values['label'])
 
     def before_delete(self, table, keys):
-        if table in ('artist', 'label', 'release', 'release_group', 'work'):
+        if table in ('artist', 'label', 'release', 'release_group', 'recording', 'work'):
             key = table, keys['id']
             if key in self.added:
                 self.added.remove(key)

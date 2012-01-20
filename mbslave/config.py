@@ -13,6 +13,7 @@ class SolrConfig(object):
         self.index_labels = True
         self.index_releases = True
         self.index_release_groups = True
+        self.index_recordings = True
         self.index_works = True
 
     def parse(self, parser, section):
