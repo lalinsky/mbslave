@@ -1,5 +1,6 @@
 import itertools
 import urllib2
+import psycopg2.extras
 from lxml import etree as ET
 from lxml.builder import E
 from mbslave.replication import ReplicationHook
@@ -9,18 +10,47 @@ def placeholders(ids):
     return ", ".join(["%s" for i in ids])
 
 
-def fetch_artists(db, ids=()):
+def iter_artist_aliases(db, ids=()):
+    query = """
+        SELECT a.artist, an.name
+        FROM artist_alias a
+        JOIN artist_name an ON a.name=an.id
+    """
+    if ids:
+        ids = tuple(set(ids))
+        query += " WHERE a.artist IN (%s)" % placeholders(ids)
+    query += " ORDER BY a.artist"
+    cursor = db.cursor()
+    cursor.execute(query, ids)
+    last_id = None
+    aliases = None
+    for id, alias in cursor:
+        if last_id != id:
+            if aliases:
+                yield {'_id': last_id, 'aliases': aliases}
+            last_id = id
+            aliases = []
+        aliases.append(alias)
+    if aliases:
+        yield {'_id': last_id, 'aliases': aliases}
+
+
+def iter_artists(db, ids=()):
     query = """
         SELECT
-            a.gid,
-            an.name,
-            at.name,
-            c.name,
-            c.iso_code,
-            a.ipi_code,
-            g.name
+            a.id AS _id,
+            a.gid AS id,
+            a.comment AS disambiguation,
+            an.name AS name,
+            asn.name AS sortname,
+            at.name AS type,
+            c.name AS country,
+            c.iso_code AS country_code,
+            a.ipi_code AS ipi,
+            g.name AS gender
         FROM artist a
         JOIN artist_name an ON a.name=an.id
+        JOIN artist_name asn ON a.sort_name=asn.id
         LEFT JOIN artist_type at ON a.type=at.id
         LEFT JOIN country c ON a.country=c.id
         LEFT JOIN gender g ON a.gender=g.id
@@ -29,23 +59,59 @@ def fetch_artists(db, ids=()):
         ids = tuple(set(ids))
         query += " WHERE a.id IN (%s)" % placeholders(ids)
     query += " ORDER BY a.id"
-    cursor = db.cursor()
+    cursor = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
     cursor.execute(query, ids)
-    for gid, name, type, country_name, country_iso_code, ipi_code, gender in cursor:
+    return cursor
+
+
+def grab_next(iter):
+    try:
+        return iter.next()
+    except StopIteration:
+        return None
+
+
+def merge(main, *extra):
+    current = map(grab_next, extra)
+    for row in main:
+        row = dict(row)
+        for i, val in enumerate(current):
+            if val is not None:
+                if val['_id'] == row['_id']:
+                    row.update(val)
+                    current[i] = grab_next(extra[i])
+        yield row
+
+
+def add_country_fields(fields, name, code):
+    fields.append(E.field(name.decode('utf8'), name='country'))
+    fields.append(E.field(code, name='country'))
+    if code == 'GB':
+        fields.append(E.field('UK', name='country'))
+
+
+def fetch_artists(db, ids=()):
+    iter = merge(iter_artists(db, ids), iter_artist_aliases(db, ids))
+    for row in iter:
         fields = [
             E.field('artist', name='kind'),
-            E.field(gid, name='id'),
-            E.field(name.decode('utf8'), name='name'),
+            E.field(row['id'], name='id'),
+            E.field(row['name'].decode('utf8'), name='name'),
+            E.field(row['sortname'].decode('utf8'), name='sortname'),
         ]
-        if type:
-            fields.append(E.field(type, name='type'))
-        if gender:
-            fields.append(E.field(gender, name='gender'))
-        if ipi_code:
-            fields.append(E.field(ipi_code, name='ipi'))
-        if country_name:
-            fields.append(E.field(country_name.decode('utf8'), name='country'))
-            fields.append(E.field(country_iso_code, name='country'))
+        if row['disambiguation']:
+            fields.append(E.field(row['disambiguation'].decode('utf8'), name='disambiguation'))
+        if row['type']:
+            fields.append(E.field(row['type'], name='type'))
+        if row['gender']:
+            fields.append(E.field(row['gender'], name='gender'))
+        if row['ipi']:
+            fields.append(E.field(row['ipi'].decode('utf8'), name='ipi'))
+        if row['country']:
+            add_country_fields(fields, row['country'], row['country_code'])
+        if 'aliases' in row and row['aliases']:
+            for alias in row['aliases']:
+                fields.append(E.field(alias.decode('utf8'), name='alias'))
         yield E.doc(*fields)
 
 
@@ -82,6 +148,7 @@ def fetch_labels(db, ids=()):
             fields.append(E.field(ipi_code, name='ipi'))
         if label_code:
             fields.append(E.field('LC-%04d' % label_code, name='code'))
+            fields.append(E.field('LC%04d' % label_code, name='code'))
         if country_name:
             fields.append(E.field(country_name.decode('utf8'), name='country'))
             fields.append(E.field(country_iso_code, name='country'))
@@ -216,6 +283,8 @@ class SolrReplicationHook(ReplicationHook):
     def after_insert(self, table, values):
         if table in ('artist', 'label', 'release', 'release_group', 'work'):
             self.add_update(table, values['id'])
+        elif table == 'artist_alias':
+            self.add_update('artist', values['artist'])
 
     def after_update(self, table, keys, values):
         if table in ('artist', 'label', 'release', 'release_group', 'work'):
@@ -226,7 +295,8 @@ class SolrReplicationHook(ReplicationHook):
                 cursor.execute("SELECT id FROM %s.release WHERE release_group = %%s" % (self.schema,), (id,))
                 for release_id, in cursor:
                     self.add_update('release', release_id)
-
+        elif table == 'artist_alias':
+            self.add_update('artist', values['artist'])
 
     def before_delete(self, table, keys):
         if table in ('artist', 'label', 'release', 'release_group', 'work'):
@@ -238,6 +308,12 @@ class SolrReplicationHook(ReplicationHook):
             row = cursor.fetchone()
             if row is not None:
                 self.deleted[key] = row[0]
+        elif table == 'artist_alias':
+            cursor = self.db.cursor()
+            cursor.execute("SELECT artist FROM %s.artist_alias WHERE id = %%s" % (self.schema,), (id,))
+            for artist_id, in cursor:
+                self.add_update('artist', artist_id)
+
 
     def after_commit(self):
         xml = []

@@ -34,6 +34,15 @@
 		<!-- Artist name, label name, release group title, recording or recording title. -->
 		<field name="name" type="text" indexed="true" />
 
+		<!-- Artist sort name, label sort name. -->
+		<field name="sortname" type="text" indexed="true" />
+
+		<!-- Artist sort name, label sort name. -->
+		<field name="disambiguation" type="text" indexed="true" />
+
+		<!-- Artist alias, label alias, work alias. -->
+		<field name="alias" type="text" indexed="true" stored="false" multiValued="true" />
+
 		<!-- Only used for release groups, releases and recordings. -->
 		<field name="artist" type="text" indexed="true" multiValued="true" />
 
@@ -62,7 +71,7 @@
 		<field name="barcode" type="text" indexed="true" />
 
 		<!-- Country name or ISO code. Applicable for: artist, label, release. -->
-		<field name="country" type="text" indexed="true" multiValued="true" />
+		<field name="country" type="text" indexed="true" stored="false" multiValued="true" />
 
 	</fields>
 
