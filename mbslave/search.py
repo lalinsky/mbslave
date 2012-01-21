@@ -359,7 +359,7 @@ class SolrReplicationHook(ReplicationHook):
                 self.deleted[key] = row[0]
         elif table == 'artist_alias':
             cursor = self.db.cursor()
-            cursor.execute("SELECT artist FROM %s.artist_alias WHERE id = %%s" % (self.schema,), (id,))
+            cursor.execute("SELECT artist FROM %s.artist_alias WHERE id = %%s" % (self.schema,), (keys['id'],))
             for artist_id, in cursor:
                 self.add_update('artist', artist_id)
         elif table == 'label_alias':
