@@ -230,15 +230,47 @@ def fetch_recordings(db, ids=()):
         yield E.doc(*fields)
 
 
-def fetch_releases(db, ids=()):
+def iter_release_labels(db, ids=()):
+    query = """
+        SELECT rl.release, rl.catalog_number, ln.name
+        FROM release_label rl
+        LEFT JOIN label l ON rl.label = l.id
+        LEFT JOIN label_name ln ON l.name = ln.id
+    """
+    if ids:
+        ids = tuple(set(ids))
+        query += " WHERE rl.release IN (%s)" % (placeholders(ids),)
+    query += " ORDER BY rl.release"
+    cursor = db.cursor()
+    cursor.execute(query, ids)
+    last_id = None
+    catnos = set()
+    labels = set()
+    for id, catno, label in cursor:
+        if last_id != id:
+            if catnos or labels:
+                yield {'_id': last_id, 'catnos': catnos, 'labels': labels}
+            last_id = id
+            catnos = set()
+            labels = set()
+        if catno:
+            catnos.add(catno)
+        if label:
+            labels.add(label)
+    if catnos or labels:
+        yield {'_id': last_id, 'catnos': catnos, 'labels': labels}
+
+
+def iter_releases(db, ids=()):
     query = """
         SELECT
-            r.gid,
-            rn.name,
-            rgt.name,
-            rs.name,
-            an.name,
-            r.barcode
+            r.id AS _id,
+            r.gid AS id,
+            rn.name AS name,
+            rgt.name AS type,
+            rs.name AS status,
+            an.name AS artist,
+            r.barcode AS barcode
         FROM release r
         JOIN release_name rn ON r.name = rn.id
         JOIN artist_credit ac ON r.artist_credit = ac.id
@@ -251,21 +283,32 @@ def fetch_releases(db, ids=()):
         ids = tuple(set(ids))
         query += " WHERE r.id IN (%s)" % placeholders(ids)
     query += " ORDER BY r.id"
-    cursor = db.cursor()
+    cursor = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
     cursor.execute(query, ids)
-    for gid, name, type, status, artist, barcode in cursor:
+    return cursor
+
+
+def fetch_releases(db, ids=()):
+    iter = merge(iter_releases(db, ids), iter_release_labels(db, ids))
+    for row in iter:
         fields = [
             E.field('release', name='kind'),
-            E.field(gid, name='id'),
-            E.field(name.decode('utf8'), name='name'),
-            E.field(artist.decode('utf8'), name='artist'),
+            E.field(row['id'], name='id'),
+            E.field(row['name'].decode('utf8'), name='name'),
+            E.field(row['artist'].decode('utf8'), name='artist'),
         ]
-        if type:
-            fields.append(E.field(type, name='type'))
-        if status:
-            fields.append(E.field(status, name='status'))
-        if barcode:
-            fields.append(E.field(barcode, name='barcode'))
+        if row['type']:
+            fields.append(E.field(row['type'], name='type'))
+        if row['status']:
+            fields.append(E.field(row['status'], name='status'))
+        if row['barcode']:
+            fields.append(E.field(row['barcode'], name='barcode'))
+        if 'catnos' in row and row['catnos']:
+            for catno in row['catnos']:
+                fields.append(E.field(catno.decode('utf8'), name='catno'))
+        if 'labels' in row and row['labels']:
+            for label in row['labels']:
+                fields.append(E.field(label.decode('utf8'), name='label'))
         yield E.doc(*fields)
 
 
@@ -332,6 +375,8 @@ class SolrReplicationHook(ReplicationHook):
             self.add_update('artist', values['artist'])
         elif table == 'label_alias':
             self.add_update('label', values['label'])
+        elif table == 'release_label':
+            self.add_update('release', values['release'])
 
     def after_update(self, table, keys, values):
         if table in ('artist', 'label', 'release', 'release_group', 'recording', 'work'):
@@ -342,10 +387,17 @@ class SolrReplicationHook(ReplicationHook):
                 cursor.execute("SELECT id FROM %s.release WHERE release_group = %%s" % (self.schema,), (id,))
                 for release_id, in cursor:
                     self.add_update('release', release_id)
+            elif table == 'label':
+                cursor = self.db.cursor()
+                cursor.execute("SELECT release FROM %s.release_label WHERE label = %%s" % (self.schema,), (id,))
+                for release_id, in cursor:
+                    self.add_update('release', release_id)
         elif table == 'artist_alias':
             self.add_update('artist', values['artist'])
         elif table == 'label_alias':
             self.add_update('label', values['label'])
+        elif table == 'release_label':
+            self.add_update('release', values['release'])
 
     def before_delete(self, table, keys):
         if table in ('artist', 'label', 'release', 'release_group', 'recording', 'work'):
@@ -364,9 +416,14 @@ class SolrReplicationHook(ReplicationHook):
                 self.add_update('artist', artist_id)
         elif table == 'label_alias':
             cursor = self.db.cursor()
-            cursor.execute("SELECT label FROM %s.label_alias WHERE id = %%s" % (self.schema,), (id,))
+            cursor.execute("SELECT label FROM %s.label_alias WHERE id = %%s" % (self.schema,), (keys['id'],))
             for label_id, in cursor:
                 self.add_update('label', label_id)
+        elif table == 'release_label':
+            cursor = self.db.cursor()
+            cursor.execute("SELECT release FROM %s.release_label WHERE id = %%s" % (self.schema,), (keys['id'],))
+            for release_id, in cursor:
+                self.add_update('release', release_id)
 
 
     def after_commit(self):
