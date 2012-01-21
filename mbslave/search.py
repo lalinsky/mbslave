@@ -312,12 +312,13 @@ def fetch_releases(db, ids=()):
         yield E.doc(*fields)
 
 
-def fetch_works(db, ids=()):
+def iter_works(db, ids=()):
     query = """
         SELECT
-            w.gid,
-            wn.name,
-            wt.name,
+            w.id AS _id,
+            w.gid AS id,
+            wn.name AS name,
+            wt.name AS type,
             w.iswc
         FROM work w
         JOIN work_name wn ON w.name = wn.id
@@ -327,18 +328,25 @@ def fetch_works(db, ids=()):
         ids = tuple(set(ids))
         query += " WHERE w.id IN (%s)" % placeholders(ids)
     query += " ORDER BY w.id"
-    cursor = db.cursor()
+    cursor = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
     cursor.execute(query, ids)
-    for gid, name, type, iswc in cursor:
+    return cursor
+
+
+def fetch_works(db, ids=()):
+    iter = merge(iter_works(db, ids), iter_aliases(db, 'work', ids))
+    for row in iter:
         fields = [
             E.field('work', name='kind'),
-            E.field(gid, name='id'),
-            E.field(name.decode('utf8'), name='name'),
+            E.field(row['id'], name='id'),
+            E.field(row['name'].decode('utf8'), name='name'),
         ]
-        if type:
-            fields.append(E.field(type.decode('utf8'), name='type'))
-        if iswc:
-            fields.append(E.field(iswc, name='iswc'))
+        if row['type']:
+            fields.append(E.field(row['type'].decode('utf8'), name='type'))
+        if row['iswc']:
+            fields.append(E.field(row['iswc'].decode('utf8'), name='iswc'))
+        if 'aliases' in row and row['aliases']:
+            add_alias_fields(fields, row['aliases'])
         yield E.doc(*fields)
 
 
@@ -375,6 +383,8 @@ class SolrReplicationHook(ReplicationHook):
             self.add_update('artist', values['artist'])
         elif table == 'label_alias':
             self.add_update('label', values['label'])
+        elif table == 'work_alias':
+            self.add_update('work', values['work'])
         elif table == 'release_label':
             self.add_update('release', values['release'])
 
@@ -396,6 +406,8 @@ class SolrReplicationHook(ReplicationHook):
             self.add_update('artist', values['artist'])
         elif table == 'label_alias':
             self.add_update('label', values['label'])
+        elif table == 'work_alias':
+            self.add_update('work', values['work'])
         elif table == 'release_label':
             self.add_update('release', values['release'])
 
@@ -419,12 +431,16 @@ class SolrReplicationHook(ReplicationHook):
             cursor.execute("SELECT label FROM %s.label_alias WHERE id = %%s" % (self.schema,), (keys['id'],))
             for label_id, in cursor:
                 self.add_update('label', label_id)
+        elif table == 'work_alias':
+            cursor = self.db.cursor()
+            cursor.execute("SELECT work FROM %s.work_alias WHERE id = %%s" % (self.schema,), (keys['id'],))
+            for work_id, in cursor:
+                self.add_update('work', work_id)
         elif table == 'release_label':
             cursor = self.db.cursor()
             cursor.execute("SELECT release FROM %s.release_label WHERE id = %%s" % (self.schema,), (keys['id'],))
             for release_id, in cursor:
                 self.add_update('release', release_id)
-
 
     def after_commit(self):
         xml = []
