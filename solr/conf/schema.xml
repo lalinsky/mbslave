@@ -7,10 +7,12 @@
 			<analyzer type="index">
 				<tokenizer class="solr.StandardTokenizerFactory"/>
 				<filter class="solr.LowerCaseFilterFactory"/>
+				<filter class="solr.ASCIIFoldingFilterFactory"/> <!-- FIXME use MB's unaccent code -->
 			</analyzer>
 			<analyzer type="query">
 				<tokenizer class="solr.StandardTokenizerFactory"/>
 				<filter class="solr.LowerCaseFilterFactory"/>
+				<filter class="solr.ASCIIFoldingFilterFactory"/> <!-- FIXME use MB's unaccent code -->
 			</analyzer>
 		</fieldType>
 	</types>
@@ -66,6 +68,12 @@
 
 		<!-- Label code. Applicable for: label. -->
 		<field name="code" type="text" indexed="true" multiValued="true" />
+
+		<!-- Release label. Applicable for: release. -->
+		<field name="catno" type="text" indexed="true" stored="false" multiValued="true" />
+
+		<!-- Release catalog number. Applicable for: release. -->
+		<field name="label" type="text" indexed="true" stored="false" multiValued="true" />
 
 		<!-- Barcode. Applicable for: release. -->
 		<field name="barcode" type="text" indexed="true" />
