@@ -10,7 +10,6 @@ schema=musicbrainz
 base_url=http://ftp.musicbrainz.org/pub/musicbrainz/data/replication/
 
 [TABLES]
-ignore
 #ignore=tracklist_index
 
 [solr]
