@@ -4,6 +4,7 @@ import ConfigParser
 class ConfigSection(object):
     pass
 
+
 class SolrConfig(object):
 
     def __init__(self):
@@ -27,6 +28,19 @@ class SolrConfig(object):
                 setattr(self, key, parser.getboolean(section, key))
 
 
+class MonitoringConfig(object):
+
+    def __init__(self):
+        self.enabled = False
+        self.status_file = '/tmp/mbslave-status.xml'
+
+    def parse(self, parser, section):
+        if parser.has_option(section, 'enabled'):
+            self.enabled = parser.getboolean(section, 'enabled')
+        if parser.has_option(section, 'status_file'):
+            self.status_file = parser.get(section, 'status_file')
+
+
 class Config(object):
 
     def __init__(self, path):
@@ -40,6 +54,9 @@ class Config(object):
         self.solr = SolrConfig()
         if self.cfg.has_section('solr'):
             self.solr.parse(self.cfg, 'solr')
+        self.monitoring = MonitoringConfig()
+        if self.cfg.has_section('monitoring'):
+            self.monitoring.parse(self.cfg, 'monitoring')
 
     def make_psql_args(self):
         opts = {}

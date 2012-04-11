@@ -24,3 +24,7 @@ index_release_groups=yes
 index_recordings=yes
 index_works=yes
 
+[monitoring]
+enabled=no
+status_file=/tmp/mbslave-status.xml
+

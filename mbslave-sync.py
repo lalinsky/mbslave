@@ -173,13 +173,22 @@ cursor = db.cursor()
 cursor.execute("SELECT current_schema_sequence, current_replication_sequence FROM %s.replication_control" % schema)
 schema_seq, replication_seq = cursor.fetchone()
 
+status = StatusReport(schema_seq, replication_seq)
+if config.monitoring.enabled:
+    status.load(config.monitoring.status_file)
+
 while True:
     replication_seq += 1
     hook = hook_class(config, db, schema)
     tmp = download_packet(base_url, replication_seq)
     if tmp is None:
         print 'Not found, stopping'
+        status.end()
         break
     process_tar(tmp, db, schema, ignored_tables, schema_seq, replication_seq, hook)
     tmp.close()
+    status.update(replication_seq)
+
+if config.monitoring.enabled:
+    status.save(config.monitoring.status_file)
 
