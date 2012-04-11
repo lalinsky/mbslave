@@ -10,6 +10,7 @@ import urllib2
 import shutil
 import tempfile
 from mbslave import Config, ReplicationHook, connect_db
+from mbslave.monitoring import StatusReport
 
 
 def parse_data_fields(s):
