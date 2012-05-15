@@ -112,6 +112,7 @@ echo "UPDATE replication_control SET current_schema_sequence = 14;" | ./mbslave-
 ### Release 2012-05-15
 
 ```sh
+grep 'CREATE VIEW' sql/CreateSimpleViews.sql | sed 's/CREATE/DROP/' | sed 's/ AS/;/' | ./mbslave-psql.py
 ./mbslave-psql.py <sql/updates/20120420-editor-improvements.sql
 ./mbslave-psql.py <sql/updates/20120417-improved-aliases.sql
 ./mbslave-psql.py <sql/updates/20120423-release-group-types.sql
@@ -126,6 +127,7 @@ echo "UPDATE replication_control SET current_schema_sequence = 14;" | ./mbslave-
 ./mbslave-psql.py <sql/updates/20120314-add-tracknumber.sql
 ./mbslave-psql.py <sql/updates/20120412-add-ipi-tables.sql
 ./mbslave-psql.py <sql/updates/20120508-unknown-end-dates.sql
+./mbslave-psql.py <sql/CreateSimpleViews.sql
 echo "UPDATE replication_control SET current_schema_sequence = 15;" | ./mbslave-psql.py
 ```
 
