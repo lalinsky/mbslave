@@ -109,6 +109,26 @@ echo "CREATE INDEX edit_label_idx_status ON edit_label (status);" | ./mbslave-ps
 echo "UPDATE replication_control SET current_schema_sequence = 14;" | ./mbslave-psql.py
 ```
 
+### Release 2012-05-15
+
+```sh
+./mbslave-psql.py <sql/updates/20120420-editor-improvements.sql
+./mbslave-psql.py <sql/updates/20120417-improved-aliases.sql
+./mbslave-psql.py <sql/updates/20120423-release-group-types.sql
+./mbslave-psql.py <sql/updates/20120320-remove-url-refcount.sql
+./mbslave-psql.py <sql/updates/20120410-multiple-iswcs-per-work.sql
+./mbslave-psql.py <sql/updates/20120430-timeline-events.sql
+./mbslave-psql.py <sql/updates/20120501-timeline-events.sql
+./mbslave-psql.py <sql/updates/20120405-rename-language-columns.sql
+./mbslave-psql.py <sql-extra/20120406-update-language-codes.sql
+./mbslave-psql.py <sql/updates/20120411-add-work-language.sql
+./mbslave-psql.py <sql/updates/20120411-add-work-language.sql
+./mbslave-psql.py <sql/updates/20120314-add-tracknumber.sql
+./mbslave-psql.py <sql/updates/20120412-add-ipi-tables.sql
+./mbslave-psql.py <sql/updates/20120508-unknown-end-dates.sql
+echo "UPDATE replication_control SET current_schema_sequence = 15;" | ./mbslave-psql.py
+```
+
 ## Solr Search Index (Work-In-Progress)
 
 If you would like to also build a Solr index for searching, mbslave includes a script to
