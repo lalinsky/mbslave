@@ -123,7 +123,6 @@ grep 'CREATE VIEW' sql/CreateSimpleViews.sql | sed 's/CREATE/DROP/' | sed 's/ AS
 ./mbslave-psql.py <sql/updates/20120405-rename-language-columns.sql
 ./mbslave-psql.py <sql-extra/20120406-update-language-codes.sql
 ./mbslave-psql.py <sql/updates/20120411-add-work-language.sql
-./mbslave-psql.py <sql/updates/20120411-add-work-language.sql
 ./mbslave-psql.py <sql/updates/20120314-add-tracknumber.sql
 ./mbslave-psql.py <sql/updates/20120412-add-ipi-tables.sql
 ./mbslave-psql.py <sql/updates/20120508-unknown-end-dates.sql
