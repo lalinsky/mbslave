@@ -319,9 +319,10 @@ def iter_works(db, ids=()):
             w.gid AS id,
             wn.name AS name,
             wt.name AS type,
-            w.iswc
+            iswc.iswc
         FROM work w
         JOIN work_name wn ON w.name = wn.id
+        JOIN iswc ON w.id = iswc.work
         LEFT JOIN work_type wt ON w.type = wt.id
     """
     if ids:
