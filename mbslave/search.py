@@ -4,6 +4,7 @@ import psycopg2.extras
 from lxml import etree as ET
 from lxml.builder import E
 from mbslave.replication import ReplicationHook
+import sys
 
 
 def placeholders(ids):
@@ -46,12 +47,13 @@ def iter_artists(db, ids=()):
             at.name AS type,
             c.name AS country,
             c.iso_code AS country_code,
-            a.ipi_code AS ipi,
+            ipi.ipi AS ipi,
             g.name AS gender
         FROM artist a
         JOIN artist_name an ON a.name=an.id
         JOIN artist_name asn ON a.sort_name=asn.id
         LEFT JOIN artist_type at ON a.type=at.id
+        LEFT JOIN artist_ipi ipi ON a.id=ipi.artist
         LEFT JOIN country c ON a.country=c.id
         LEFT JOIN gender g ON a.gender=g.id
     """
@@ -130,12 +132,13 @@ def iter_labels(db, ids=()):
             lt.name AS type,
             c.name AS country,
             c.iso_code AS country_code,
-            l.ipi_code AS ipi,
+            ipi.ipi AS ipi,
             l.label_code AS code
         FROM label l
         JOIN label_name ln ON l.name=ln.id
         JOIN label_name lsn ON l.sort_name=lsn.id
         LEFT JOIN label_type lt ON l.type=lt.id
+        LEFT JOIN label_ipi ipi ON l.id=ipi.label
         LEFT JOIN country c ON l.country=c.id
     """
     if ids:
@@ -183,7 +186,7 @@ def fetch_release_groups(db, ids=()):
         JOIN release_name rgn ON rg.name = rgn.id
         JOIN artist_credit ac ON rg.artist_credit = ac.id
         JOIN artist_name an ON ac.name = an.id
-        LEFT JOIN release_group_type rgt ON rg.type = rgt.id
+        LEFT JOIN release_group_primary_type rgt ON rg.type = rgt.id
     """
     if ids:
         ids = tuple(set(ids))
@@ -204,30 +207,44 @@ def fetch_release_groups(db, ids=()):
 
 
 def fetch_recordings(db, ids=()):
-    query = """
-        SELECT
-            r.gid,
-            rn.name,
-            an.name
-        FROM recording r
-        JOIN track_name rn ON r.name = rn.id
-        JOIN artist_credit ac ON r.artist_credit = ac.id
-        JOIN artist_name an ON ac.name = an.id
-    """
-    if ids:
-        ids = tuple(set(ids))
-        query += " WHERE r.id IN (%s)" % placeholders(ids)
-    query += " ORDER BY r.id"
-    cursor = db.cursor()
-    cursor.execute(query, ids)
-    for gid, name, artist in cursor:
-        fields = [
-            E.field('recording', name='kind'),
-            E.field(gid, name='id'),
-            E.field(name.decode('utf8'), name='name'),
-            E.field(artist.decode('utf8'), name='artist'),
-        ]
-        yield E.doc(*fields)
+    i = 0
+    # 3000000 row usually takes ~ 400mb
+    while True:
+        query = """
+            SELECT
+        		r.gid,
+        		rn.name,
+        		an.name
+        	FROM recording r
+        	JOIN track_name rn ON r.name = rn.id
+        	JOIN artist_credit ac ON r.artist_credit = ac.id
+        	JOIN artist_name an ON ac.name = an.id
+        	ORDER BY r.id
+        	LIMIT 3000000
+        	OFFSET """
+        query += str(i)
+        i += 3000000
+        
+        if ids:
+        	ids = tuple(set(ids))
+        	query += " WHERE r.id IN (%s)" % placeholders(ids)
+        cursor = db.cursor()
+        cursor.execute(query, ids)
+        
+        if cursor.rowcount == 0:
+            break
+        for gid, name, artist in cursor:
+            try:
+                fields = [
+                	E.field('recording', name='kind'),
+                	E.field(gid, name='id'),
+                	E.field(name.decode('utf8'), name='name'),
+                	E.field(artist.decode('utf8'), name='artist'),
+                ]
+                yield E.doc(*fields)
+            except Exception as detail:
+                print detail
+                
 
 
 def iter_release_labels(db, ids=()):
@@ -276,7 +293,7 @@ def iter_releases(db, ids=()):
         JOIN artist_credit ac ON r.artist_credit = ac.id
         JOIN artist_name an ON ac.name = an.id
         JOIN release_group rg ON r.release_group = rg.id
-        LEFT JOIN release_group_type rgt ON rg.type = rgt.id
+        LEFT JOIN release_group_primary_type rgt ON rg.type = rgt.id
         LEFT JOIN release_status rs ON r.status = rs.id
     """
     if ids:
@@ -467,4 +484,3 @@ class SolrReplicationHook(ReplicationHook):
         print ' - Updated Solr index at', self.cfg.solr.url
         resp = urllib2.urlopen(req)
         the_page = resp.read()
-
