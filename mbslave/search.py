@@ -4,7 +4,6 @@ import psycopg2.extras
 from lxml import etree as ET
 from lxml.builder import E
 from mbslave.replication import ReplicationHook
-import sys
 
 
 def placeholders(ids):
@@ -208,7 +207,7 @@ def fetch_release_groups(db, ids=()):
 
 def fetch_recordings(db, ids=()):
     i = 0
-    # 3000000 row usually takes ~ 400mb
+    # 3.000.000 rows usually takes ~400mb memory
     while True:
         query = """
             SELECT
