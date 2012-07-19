@@ -7,7 +7,7 @@ import sys
 import os
 
 
-def load_tar(filename, db, schema, ignored_tables):
+def load_tar(filename, db, schema, not_ignored_tables):
     print "Importing data from", filename
     tar = tarfile.open(filename, 'r:bz2')
     cursor = db.cursor()
@@ -16,7 +16,7 @@ def load_tar(filename, db, schema, ignored_tables):
             continue
         table = member.name.split('/')[1].replace('_sanitised', '')
         fulltable = schema + "." + table
-        if table in ignored_tables:
+        if table not in not_ignored_tables:
             print " - Ignoring", fulltable
             continue
         cursor.execute("SELECT 1 FROM %s LIMIT 1" % fulltable)
@@ -43,7 +43,8 @@ if config.has_option('DATABASE', 'port'):
 db = psycopg2.connect(**opts)
 
 schema = config.get('DATABASE', 'schema')
-ignored_tables = set(config.get('TABLES', 'ignore').split(','))
+cursor.execute("SELECT array_to_string((SELECT array_agg(table_name::TEXT) FROM information_schema.tables WHERE table_schema = '%s')::text[], ',');" % schema)
+not_ignored_tables = cursor.fetchall()[0][0].split(',')
 for filename in sys.argv[1:]:
-    load_tar(filename, db, schema, ignored_tables)
+    load_tar(filename, db, schema, not_ignored_tables)
 
