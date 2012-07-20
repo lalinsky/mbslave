@@ -41,10 +41,10 @@ if config.has_option('DATABASE', 'host'):
 if config.has_option('DATABASE', 'port'):
 	opts['port'] = config.get('DATABASE', 'port')
 db = psycopg2.connect(**opts)
-
+c0 = db.cursor()
 schema = config.get('DATABASE', 'schema')
-cursor.execute("SELECT array_to_string((SELECT array_agg(table_name::TEXT) FROM information_schema.tables WHERE table_schema = '%s')::text[], ',');" % schema)
-not_ignored_tables = cursor.fetchall()[0][0].split(',')
+c0.execute("SELECT array_to_string((SELECT array_agg(table_name::TEXT) FROM information_schema.tables WHERE table_schema = '%s')::text[], ',');" % schema)
+not_ignored_tables = c0.fetchall()[0][0].split(',')
 for filename in sys.argv[1:]:
     load_tar(filename, db, schema, not_ignored_tables)
 
