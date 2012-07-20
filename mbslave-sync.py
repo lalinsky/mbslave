@@ -5,6 +5,7 @@ import psycopg2
 import tarfile
 import sys
 import os
+import time
 import re
 import urllib2
 import shutil
@@ -50,12 +51,12 @@ def read_psql_dump(fp, types):
 
 class PacketImporter(object):
 
-    def __init__(self, db, schema, ignored_tables, replication_seq, hook):
+    def __init__(self, db, schema, not_ignored_tables, replication_seq, hook):
         self._db = db
         self._data = {}
         self._transactions = {}
         self._schema = schema
-        self._ignored_tables = ignored_tables
+        self.not_ignored_tables = not_ignored_tables
         self._hook = hook
         self._replication_seq = replication_seq
 
@@ -70,17 +71,18 @@ class PacketImporter(object):
             table = table.split(".")[1].strip('"')
             transaction = self._transactions.setdefault(xid, [])
             transaction.append((id, table, type))
-
+        
     def process(self):
-        cursor = self._db.cursor()
+        cursor = self._db.cursor()  
         stats = {}
+
         self._hook.begin(self._replication_seq)
         for xid in sorted(self._transactions.keys()):
             transaction = self._transactions[xid]
             #print ' - Running transaction', xid
             #print 'BEGIN; --', xid
             for id, table, type in sorted(transaction):
-                if table in self._ignored_tables:
+                if table not in self.not_ignored_tables:
                     continue
                 fulltable = self._schema + '.' + table
                 if fulltable not in stats:
@@ -107,7 +109,14 @@ class PacketImporter(object):
                     sql += ' WHERE ' + ' AND '.join('%s%s%%s' % (i, ' IS ' if keys[i] is None else '=') for i in keys.keys())
                     params.extend(keys.values())
                 #print sql, params
-                cursor.execute(sql, params)
+                try:
+                    cursor.execute(sql, params)
+                except Exception as err:
+                    print "Error: "
+                    print err
+                self._db.commit()
+
+                    
                 if type == 'd':
                     self._hook.after_delete(table, keys)
                 elif type == 'u':
@@ -119,7 +128,6 @@ class PacketImporter(object):
         for table in sorted(stats.keys()):
             print '   * %-30s\t%d\t%d\t%d' % (table, stats[table]['i'], stats[table]['u'], stats[table]['d'])
         self._hook.before_commit()
-        self._db.commit()
         self._hook.after_commit()
 
 
@@ -159,18 +167,18 @@ def download_packet(base_url, replication_seq):
 
 config = Config(os.path.dirname(__file__) + '/mbslave.conf')
 db = connect_db(config)
+cursor = db.cursor()
 
 schema = config.get('DATABASE', 'schema')
 base_url = config.get('MUSICBRAINZ', 'base_url')
-ignored_tables = set(config.get('TABLES', 'ignore').split(','))
-
+cursor.execute("SELECT array_to_string((SELECT array_agg(table_name::TEXT) FROM information_schema.tables WHERE table_schema = '%s')::text[], ',');" % schema)
+not_ignored_tables = cursor.fetchall()[0][0].split(',')
 if config.solr.enabled:
     from mbslave.search import SolrReplicationHook
     hook_class = SolrReplicationHook
 else:
     hook_class = ReplicationHook
 
-cursor = db.cursor()
 cursor.execute("SELECT current_schema_sequence, current_replication_sequence FROM %s.replication_control" % schema)
 schema_seq, replication_seq = cursor.fetchone()
 
@@ -178,17 +186,21 @@ status = StatusReport(schema_seq, replication_seq)
 if config.monitoring.enabled:
     status.load(config.monitoring.status_file)
 
+start = time.time()
+
 while True:
     replication_seq += 1
+    print replication_seq
     hook = hook_class(config, db, schema)
     tmp = download_packet(base_url, replication_seq)
     if tmp is None:
         print 'Not found, stopping'
         status.end()
         break
-    process_tar(tmp, db, schema, ignored_tables, schema_seq, replication_seq, hook)
+    process_tar(tmp, db, schema, not_ignored_tables, schema_seq, replication_seq, hook)
     tmp.close()
     status.update(replication_seq)
+    print time.time() - start
 
 if config.monitoring.enabled:
     status.save(config.monitoring.status_file)
