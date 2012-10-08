@@ -22,7 +22,7 @@ class SolrConfig(object):
             self.enabled = parser.getboolean(section, 'enabled')
         if parser.has_option(section, 'url'):
             self.url = parser.get(section, 'url').rstrip('/')
-        for name in ('artists', 'labels', 'releases', 'release_groups', 'works'):
+        for name in ('artists', 'labels', 'releases', 'release_groups', 'recordings', 'works'):
             key = 'index_%s' % name
             if parser.has_option(section, key):
                 setattr(self, key, parser.getboolean(section, key))
