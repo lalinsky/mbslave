@@ -10,6 +10,22 @@ def placeholders(ids):
     return ", ".join(["%s" for i in ids])
 
 
+def iter_list(db, query, field, ids=()):
+    cursor = db.cursor()
+    cursor.execute(query, ids)
+    last_id = None
+    values = None
+    for id, value in cursor:
+        if last_id != id:
+            if values:
+                yield {'_id': last_id, field: values}
+            last_id = id
+            values = []
+        values.append(value)
+    if values:
+        yield {'_id': last_id, field: values}
+
+
 def iter_ipi(db, entity, ids=()):
     query = """
         SELECT %(entity)s, ipi
@@ -19,19 +35,16 @@ def iter_ipi(db, entity, ids=()):
         ids = tuple(set(ids))
         query += " WHERE %s IN (%s)" % (entity, placeholders(ids))
     query += " ORDER BY %s" % (entity,)
-    cursor = db.cursor()
-    cursor.execute(query, ids)
-    last_id = None
-    aliases = None
-    for id, alias in cursor:
-        if last_id != id:
-            if aliases:
-                yield {'_id': last_id, 'ipi': aliases}
-            last_id = id
-            aliases = []
-        aliases.append(alias)
-    if aliases:
-        yield {'_id': last_id, 'ipi': aliases}
+    return iter_list(db, query, 'ipi', ids)
+
+
+def iter_iswc(db, ids=()):
+    query = "SELECT work, iswc FROM iswc"
+    if ids:
+        ids = tuple(set(ids))
+        query += " WHERE work IN (%s)" % (placeholders(ids),)
+    query += " ORDER BY work"
+    return iter_list(db, query, 'iswc', ids)
 
 
 def iter_aliases(db, entity, ids=()):
@@ -113,14 +126,9 @@ def add_country_fields(fields, name, code):
         fields.append(E.field('UK', name='country'))
 
 
-def add_alias_fields(fields, aliases):
-    for alias in aliases:
-        fields.append(E.field(alias.decode('utf8'), name='alias'))
-
-
-def add_ipi_fields(fields, codes):
-    for code in codes:
-        fields.append(E.field(code.decode('utf8'), name='ipi'))
+def add_list_fields(fields, values, name):
+    for value in values:
+        fields.append(E.field(value.decode('utf8'), name=name))
 
 
 def fetch_artists(db, ids=()):
@@ -141,9 +149,9 @@ def fetch_artists(db, ids=()):
         if row['country']:
             add_country_fields(fields, row['country'], row['country_code'])
         if 'aliases' in row and row['aliases']:
-            add_alias_fields(fields, row['aliases'])
+            add_list_fields(fields, row['aliases'], 'alias')
         if 'ipi' in row and row['ipi']:
-            add_ipi_fields(fields, row['ipi'])
+            add_list_fields(fields, row['ipi'], 'ipi')
         yield E.doc(*fields)
 
 
@@ -193,9 +201,9 @@ def fetch_labels(db, ids=()):
             fields.append(E.field('LC-%04d' % row['code'], name='code'))
             fields.append(E.field('LC%04d' % row['code'], name='code'))
         if 'aliases' in row and row['aliases']:
-            add_alias_fields(fields, row['aliases'])
+            add_list_fields(fields, row['aliases'], 'alias')
         if 'ipi' in row and row['ipi']:
-            add_ipi_fields(fields, row['ipi'])
+            add_list_fields(fields, row['ipi'], 'ipi')
         yield E.doc(*fields)
 
 
@@ -345,8 +353,7 @@ def iter_works(db, ids=()):
             w.id AS _id,
             w.gid AS id,
             wn.name AS name,
-            wt.name AS type,
-            w.iswc
+            wt.name AS type
         FROM work w
         JOIN work_name wn ON w.name = wn.id
         LEFT JOIN work_type wt ON w.type = wt.id
@@ -361,7 +368,7 @@ def iter_works(db, ids=()):
 
 
 def fetch_works(db, ids=()):
-    iter = merge(iter_works(db, ids), iter_aliases(db, 'work', ids))
+    iter = merge(iter_works(db, ids), iter_aliases(db, 'work', ids), iter_iswc(db, ids))
     for row in iter:
         fields = [
             E.field('work', name='kind'),
@@ -370,10 +377,10 @@ def fetch_works(db, ids=()):
         ]
         if row['type']:
             fields.append(E.field(row['type'].decode('utf8'), name='type'))
-        if row['iswc']:
-            fields.append(E.field(row['iswc'].decode('utf8'), name='iswc'))
         if 'aliases' in row and row['aliases']:
-            add_alias_fields(fields, row['aliases'])
+            add_list_fields(fields, row['aliases'], 'alias')
+        if 'iswc' in row and row['iswc']:
+            add_list_fields(fields, row['iswc'], 'iswc')
         yield E.doc(*fields)
 
 

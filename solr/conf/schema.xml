@@ -61,7 +61,7 @@
 		<field name="ipi" type="text" indexed="true" multiValued="true" />
 
 		<!-- ISWC code. Applicable for: work. -->
-		<field name="iswc" type="text" indexed="true" />
+		<field name="iswc" type="text" indexed="true" multiValued="true" />
 
 		<!-- ISRC code. Applicable for: recording. -->
 		<field name="isrc" type="text" indexed="true" multiValued="true" />
