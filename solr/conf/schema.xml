@@ -58,7 +58,7 @@
 		<field name="gender" type="text" indexed="true" />
 
 		<!-- IPI code. Applicable for: artist, label. -->
-		<field name="ipi" type="text" indexed="true" />
+		<field name="ipi" type="text" indexed="true" multiValued="true" />
 
 		<!-- ISWC code. Applicable for: work. -->
 		<field name="iswc" type="text" indexed="true" />

@@ -10,6 +10,30 @@ def placeholders(ids):
     return ", ".join(["%s" for i in ids])
 
 
+def iter_ipi(db, entity, ids=()):
+    query = """
+        SELECT %(entity)s, ipi
+        FROM %(entity)s_ipi
+    """ % dict(entity=entity)
+    if ids:
+        ids = tuple(set(ids))
+        query += " WHERE %s IN (%s)" % (entity, placeholders(ids))
+    query += " ORDER BY %s" % (entity,)
+    cursor = db.cursor()
+    cursor.execute(query, ids)
+    last_id = None
+    aliases = None
+    for id, alias in cursor:
+        if last_id != id:
+            if aliases:
+                yield {'_id': last_id, 'ipi': aliases}
+            last_id = id
+            aliases = []
+        aliases.append(alias)
+    if aliases:
+        yield {'_id': last_id, 'ipi': aliases}
+
+
 def iter_aliases(db, entity, ids=()):
     query = """
         SELECT a.%(entity)s, an.name
@@ -46,7 +70,6 @@ def iter_artists(db, ids=()):
             at.name AS type,
             c.name AS country,
             c.iso_code AS country_code,
-            a.ipi_code AS ipi,
             g.name AS gender
         FROM artist a
         JOIN artist_name an ON a.name=an.id
@@ -95,8 +118,13 @@ def add_alias_fields(fields, aliases):
         fields.append(E.field(alias.decode('utf8'), name='alias'))
 
 
+def add_ipi_fields(fields, codes):
+    for code in codes:
+        fields.append(E.field(code.decode('utf8'), name='ipi'))
+
+
 def fetch_artists(db, ids=()):
-    iter = merge(iter_artists(db, ids), iter_aliases(db, 'artist', ids))
+    iter = merge(iter_artists(db, ids), iter_aliases(db, 'artist', ids), iter_ipi(db, 'artist', ids))
     for row in iter:
         fields = [
             E.field('artist', name='kind'),
@@ -110,12 +138,12 @@ def fetch_artists(db, ids=()):
             fields.append(E.field(row['type'], name='type'))
         if row['gender']:
             fields.append(E.field(row['gender'], name='gender'))
-        if row['ipi']:
-            fields.append(E.field(row['ipi'].decode('utf8'), name='ipi'))
         if row['country']:
             add_country_fields(fields, row['country'], row['country_code'])
         if 'aliases' in row and row['aliases']:
             add_alias_fields(fields, row['aliases'])
+        if 'ipi' in row and row['ipi']:
+            add_ipi_fields(fields, row['ipi'])
         yield E.doc(*fields)
 
 
@@ -130,7 +158,6 @@ def iter_labels(db, ids=()):
             lt.name AS type,
             c.name AS country,
             c.iso_code AS country_code,
-            l.ipi_code AS ipi,
             l.label_code AS code
         FROM label l
         JOIN label_name ln ON l.name=ln.id
@@ -148,7 +175,7 @@ def iter_labels(db, ids=()):
 
 
 def fetch_labels(db, ids=()):
-    iter = merge(iter_labels(db, ids), iter_aliases(db, 'label', ids))
+    iter = merge(iter_labels(db, ids), iter_aliases(db, 'label', ids), iter_ipi(db, 'label', ids))
     for row in iter:
         fields = [
             E.field('label', name='kind'),
@@ -160,8 +187,6 @@ def fetch_labels(db, ids=()):
             fields.append(E.field(row['disambiguation'].decode('utf8'), name='disambiguation'))
         if row['type']:
             fields.append(E.field(row['type'], name='type'))
-        if row['ipi']:
-            fields.append(E.field(row['ipi'].decode('utf8'), name='ipi'))
         if row['country']:
             add_country_fields(fields, row['country'], row['country_code'])
         if row['code']:
@@ -169,6 +194,8 @@ def fetch_labels(db, ids=()):
             fields.append(E.field('LC%04d' % row['code'], name='code'))
         if 'aliases' in row and row['aliases']:
             add_alias_fields(fields, row['aliases'])
+        if 'ipi' in row and row['ipi']:
+            add_ipi_fields(fields, row['ipi'])
         yield E.doc(*fields)
 
 
