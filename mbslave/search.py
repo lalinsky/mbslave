@@ -51,9 +51,10 @@ class Column(object):
 
 class ForeignColumn(Column):
 
-    def __init__(self, table, name, foreign=None):
+    def __init__(self, table, name, foreign=None, null=False):
         super(ForeignColumn, self).__init__(name, foreign=foreign)
         self.table = table
+        self.null = null
 
 
 schema = Schema([
@@ -62,10 +63,10 @@ schema = Schema([
         Field('disambiguation', Column('comment')),
         Field('name', Column('name', ForeignColumn('artist_name', 'name'))),
         Field('sort_name', Column('sort_name', ForeignColumn('artist_name', 'name'))),
-        Field('country', Column('country', ForeignColumn('country', 'name'))),
-        Field('country_code', Column('country', ForeignColumn('country', 'iso_code'))),
-        Field('gender', Column('gender', ForeignColumn('gender', 'name'))),
-        Field('type', Column('type', ForeignColumn('artist_type', 'name'))),
+        Field('country', Column('country', ForeignColumn('country', 'name', null=True))),
+        Field('country_code', Column('country', ForeignColumn('country', 'iso_code', null=True))),
+        Field('gender', Column('gender', ForeignColumn('gender', 'name', null=True))),
+        Field('type', Column('type', ForeignColumn('artist_type', 'name', null=True))),
         MultiField('ipi', ForeignColumn('artist_ipi', 'ipi')),
         MultiField('alias', ForeignColumn('artist_alias', 'name', ForeignColumn('artist_name', 'name'))),
     ]),
@@ -74,9 +75,9 @@ schema = Schema([
         Field('disambiguation', Column('comment')),
         Field('name', Column('name', ForeignColumn('label_name', 'name'))),
         Field('sort_name', Column('sort_name', ForeignColumn('label_name', 'name'))),
-        Field('country', Column('country', ForeignColumn('country', 'name'))),
-        Field('country_code', Column('country', ForeignColumn('country', 'iso_code'))),
-        Field('type', Column('type', ForeignColumn('label_type', 'name'))),
+        Field('country', Column('country', ForeignColumn('country', 'name', null=True))),
+        Field('country_code', Column('country', ForeignColumn('country', 'iso_code', null=True))),
+        Field('type', Column('type', ForeignColumn('label_type', 'name', null=True))),
         MultiField('ipi', ForeignColumn('label_ipi', 'ipi')),
         MultiField('alias', ForeignColumn('label_alias', 'name', ForeignColumn('label_name', 'name'))),
     ]),
@@ -84,7 +85,7 @@ schema = Schema([
         Field('id', Column('gid')),
         Field('disambiguation', Column('comment')),
         Field('name', Column('name', ForeignColumn('work_name', 'name'))),
-        Field('type', Column('type', ForeignColumn('work_type', 'name'))),
+        Field('type', Column('type', ForeignColumn('work_type', 'name', null=True))),
         MultiField('iswc', ForeignColumn('iswc', 'iswc')),
         MultiField('alias', ForeignColumn('work_alias', 'name', ForeignColumn('work_name', 'name'))),
     ]),
@@ -92,7 +93,7 @@ schema = Schema([
         Field('id', Column('gid')),
         Field('disambiguation', Column('comment')),
         Field('name', Column('name', ForeignColumn('release_name', 'name'))),
-        Field('type', Column('type', ForeignColumn('release_group_primary_type', 'name'))),
+        Field('type', Column('type', ForeignColumn('release_group_primary_type', 'name', null=True))),
         MultiField('type',
             ForeignColumn('release_group_secondary_type_join', 'secondary_type',
                 ForeignColumn('release_group_secondary_type', 'name'))),
@@ -103,15 +104,15 @@ schema = Schema([
         Field('disambiguation', Column('comment')),
         Field('barcode', Column('barcode')),
         Field('name', Column('name', ForeignColumn('release_name', 'name'))),
-        Field('status', Column('status', ForeignColumn('release_status', 'name'))),
+        Field('status', Column('status', ForeignColumn('release_status', 'name', null=True))),
         Field('artist', Column('artist_credit', ForeignColumn('artist_credit', 'name', ForeignColumn('artist_name', 'name')))),
-        MultiField('catno', ForeignColumn('release_label', 'catno')),
-        MultiField('label', ForeignColumn('release_label', 'label', ForeignColumn('label', 'name'))),
+        MultiField('catno', ForeignColumn('release_label', 'catalog_number')),
+        MultiField('label', ForeignColumn('release_label', 'label', ForeignColumn('label', 'name', ForeignColumn('label_name', 'name')))),
     ]),
     Entity('recording', [
         Field('id', Column('gid')),
         Field('disambiguation', Column('comment')),
-        Field('name', Column('name', ForeignColumn('release_name', 'name'))),
+        Field('name', Column('name', ForeignColumn('recording_name', 'name'))),
         Field('artist', Column('artist_credit', ForeignColumn('artist_credit', 'name', ForeignColumn('artist_name', 'name')))),
     ]),
 ])
@@ -133,20 +134,21 @@ def generate_iter_query(columns, joins, ids=()):
     return sql
 
 
-def iter_main(db, name, ids=()):
-    entity = schema[name]
-    joins = [name]
-    tables = set([name])
-    columns = ['%s.id' % (name,)]
+def iter_main(db, kind, ids=()):
+    entity = schema[kind]
+    joins = [kind]
+    tables = set([kind])
+    columns = ['%s.id' % (kind,)]
     names = []
     for field in entity.iter_single_fields():
-        table = name
+        table = kind
         column = field.column
         while column.foreign is not None:
             foreign_table = table + '__' + column.name + '__' + column.foreign.table
             if foreign_table not in tables:
-                joins.append('JOIN %(parent)s AS %(label)s ON %(label)s.%(child)s = %(child)s.id' % dict(
-                    parent=column.foreign.table, child=table, label=foreign_table))
+                join = 'LEFT JOIN' if column.foreign.null else 'JOIN'
+                joins.append('%(join)s %(parent)s AS %(label)s ON %(label)s.id = %(child)s.%(child_column)s' % dict(
+                    join=join, parent=column.foreign.table, child=table, child_column=column.name, label=foreign_table))
                 tables.add(foreign_table)
             table = foreign_table
             column = column.foreign
@@ -160,16 +162,17 @@ def iter_main(db, name, ids=()):
 
     for row in cursor:
         id = row[0]
-        fields = [E.field(name, name='kind')]
+        fields = [E.field(kind, name='kind')]
         for name, value in zip(names, row[1:]):
             if isinstance(value, str):
                 value = value.decode('utf8')
-            fields.append(E.field(value, name=name))
+            if value:
+                fields.append(E.field(value, name=name))
         yield id, fields
 
 
-def iter_sub(db, name, subtable, ids=()):
-    entity = schema[name]
+def iter_sub(db, kind, subtable, ids=()):
+    entity = schema[kind]
     joins = []
     tables = set()
     columns = []
@@ -184,12 +187,13 @@ def iter_sub(db, name, subtable, ids=()):
                 if table not in tables:
                     joins.append(table)
                     tables.add(table)
-                    columns.append('%s.%s' % (table, name))
+                    columns.append('%s.%s' % (table, kind))
             else:
                 foreign_table = table + '__' + last_column.name + '__' + column.table
                 if foreign_table not in tables:
-                    joins.append('JOIN %(parent)s AS %(label)s ON %(label)s.id = %(child)s.%(child_column)s' % dict(
-                        parent=column.table, child=table, child_column=column.name, label=foreign_table))
+                    join = 'LEFT JOIN' if column.null else 'JOIN'
+                    joins.append('%(join)s %(parent)s AS %(label)s ON %(label)s.id = %(child)s.%(child_column)s' % dict(
+                        join=join, parent=column.table, child=table, child_column=last_column.name, label=foreign_table))
                     tables.add(foreign_table)
                 table = foreign_table
             if column.foreign is None:
@@ -209,15 +213,16 @@ def iter_sub(db, name, subtable, ids=()):
     for row in cursor:
         id = row[0]
         if last_id != id:
-            if values:
+            if fields:
                 yield last_id, fields
             last_id = id
             fields = []
-        for name, value in zip(fields, row[1:]):
+        for name, value in zip(names, row[1:]):
             if isinstance(value, str):
                 value = value.decode('utf8')
-            fields.append(E.field(value, name=name))
-    if values:
+            if value:
+                fields.append(E.field(value, name=name))
+    if fields:
         yield last_id, fields
 
 
@@ -324,14 +329,13 @@ def grab_next(iter):
 
 def merge(main, *extra):
     current = map(grab_next, extra)
-    for row in main:
-        row = dict(row)
-        for i, val in enumerate(current):
-            if val is not None:
-                if val['_id'] == row['_id']:
-                    row.update(val)
+    for id, fields in main:
+        for i, extra_item in enumerate(current):
+            if extra_item is not None:
+                if extra_item[0] == id:
+                    fields.extend(extra_item[1])
                     current[i] = grab_next(extra[i])
-        yield row
+        yield E.doc(*fields)
 
 
 def add_country_fields(fields, name, code):
@@ -344,6 +348,16 @@ def add_country_fields(fields, name, code):
 def add_list_fields(fields, values, name):
     for value in values:
         fields.append(E.field(value.decode('utf8'), name=name))
+
+
+def fetch_entities(db, kind, ids=()):
+    sources = [iter_main(db, kind, ids)]
+    subtables = set()
+    for field in schema[kind].iter_multi_fields():
+        if field.column.table not in subtables:
+            sources.append(iter_sub(db, kind, field.column.table, ids))
+            subtables.add(field.column.table)
+    return merge(*sources)
 
 
 def fetch_artists(db, ids=()):
