@@ -1,9 +1,224 @@
 import itertools
 import urllib2
 import psycopg2.extras
+from collections import namedtuple
 from lxml import etree as ET
 from lxml.builder import E
 from mbslave.replication import ReplicationHook
+
+Entity = namedtuple('Entity', ['name', 'fields'])
+Field = namedtuple('Field', ['name', 'column'])
+MultiField = namedtuple('MultiField', ['name', 'column'])
+
+
+class Schema(object):
+
+    def __init__(self, entities):
+        self.entities = entities
+        self.entities_by_id = dict((e.name, e) for e in entities)
+
+    def __getitem__(self, name):
+        return self.entities_by_id[name]
+
+
+class Entity(object):
+
+    def __init__(self, name, fields):
+        self.name = name
+        self.fields = fields
+
+    def iter_single_fields(self, name=None):
+        for field in self.fields:
+            if isinstance(field, Field):
+                if name is not None and field.name != name:
+                    continue
+                yield field
+
+    def iter_multi_fields(self, name=None):
+        for field in self.fields:
+            if isinstance(field, MultiField):
+                if name is not None and field.name != name:
+                    continue
+                yield field
+
+
+class Column(object):
+
+    def __init__(self, name, foreign=None):
+        self.name = name
+        self.foreign = foreign
+
+
+class ForeignColumn(Column):
+
+    def __init__(self, table, name, foreign=None):
+        super(ForeignColumn, self).__init__(name, foreign=foreign)
+        self.table = table
+
+
+schema = Schema([
+    Entity('artist', [
+        Field('id', Column('gid')),
+        Field('disambiguation', Column('comment')),
+        Field('name', Column('name', ForeignColumn('artist_name', 'name'))),
+        Field('sort_name', Column('sort_name', ForeignColumn('artist_name', 'name'))),
+        Field('country', Column('country', ForeignColumn('country', 'name'))),
+        Field('country_code', Column('country', ForeignColumn('country', 'iso_code'))),
+        Field('gender', Column('gender', ForeignColumn('gender', 'name'))),
+        Field('type', Column('type', ForeignColumn('artist_type', 'name'))),
+        MultiField('ipi', ForeignColumn('artist_ipi', 'ipi')),
+        MultiField('alias', ForeignColumn('artist_alias', 'name', ForeignColumn('artist_name', 'name'))),
+    ]),
+    Entity('label', [
+        Field('id', Column('gid')),
+        Field('disambiguation', Column('comment')),
+        Field('name', Column('name', ForeignColumn('label_name', 'name'))),
+        Field('sort_name', Column('sort_name', ForeignColumn('label_name', 'name'))),
+        Field('country', Column('country', ForeignColumn('country', 'name'))),
+        Field('country_code', Column('country', ForeignColumn('country', 'iso_code'))),
+        Field('type', Column('type', ForeignColumn('label_type', 'name'))),
+        MultiField('ipi', ForeignColumn('label_ipi', 'ipi')),
+        MultiField('alias', ForeignColumn('label_alias', 'name', ForeignColumn('label_name', 'name'))),
+    ]),
+    Entity('work', [
+        Field('id', Column('gid')),
+        Field('disambiguation', Column('comment')),
+        Field('name', Column('name', ForeignColumn('work_name', 'name'))),
+        Field('type', Column('type', ForeignColumn('work_type', 'name'))),
+        MultiField('iswc', ForeignColumn('iswc', 'iswc')),
+        MultiField('alias', ForeignColumn('work_alias', 'name', ForeignColumn('work_name', 'name'))),
+    ]),
+    Entity('release_group', [
+        Field('id', Column('gid')),
+        Field('disambiguation', Column('comment')),
+        Field('name', Column('name', ForeignColumn('release_name', 'name'))),
+        Field('type', Column('type', ForeignColumn('release_group_primary_type', 'name'))),
+        MultiField('type',
+            ForeignColumn('release_group_secondary_type_join', 'secondary_type',
+                ForeignColumn('release_group_secondary_type', 'name'))),
+        Field('artist', Column('artist_credit', ForeignColumn('artist_credit', 'name', ForeignColumn('artist_name', 'name')))),
+    ]),
+    Entity('release', [
+        Field('id', Column('gid')),
+        Field('disambiguation', Column('comment')),
+        Field('barcode', Column('barcode')),
+        Field('name', Column('name', ForeignColumn('release_name', 'name'))),
+        Field('status', Column('status', ForeignColumn('release_status', 'name'))),
+        Field('artist', Column('artist_credit', ForeignColumn('artist_credit', 'name', ForeignColumn('artist_name', 'name')))),
+        MultiField('catno', ForeignColumn('release_label', 'catno')),
+        MultiField('label', ForeignColumn('release_label', 'label', ForeignColumn('label', 'name'))),
+    ]),
+    Entity('recording', [
+        Field('id', Column('gid')),
+        Field('disambiguation', Column('comment')),
+        Field('name', Column('name', ForeignColumn('release_name', 'name'))),
+        Field('artist', Column('artist_credit', ForeignColumn('artist_credit', 'name', ForeignColumn('artist_name', 'name')))),
+    ]),
+])
+
+
+SQL_SELECT_TPL = "SELECT\n%(columns)s\nFROM\n%(joins)s\nORDER BY %(sort_column)s"
+
+
+def generate_iter_query(columns, joins, ids=()):
+    id_column = columns[0]
+    tpl = ["SELECT", "%(columns)s", "FROM", "%(joins)s"]
+    if ids:
+        tpl.append("WHERE %(id_column)s IN (%(ids)s)")
+    tpl.append("ORDER BY %(id_column)s")
+    sql_columns = ',\n'.join('  ' + i for i in columns)
+    sql_joins = '\n'.join('  ' + i for i in joins)
+    sql = "\n".join(tpl) % dict(columns=sql_columns, joins=sql_joins,
+                                id_column=id_column, ids=placeholders(ids))
+    return sql
+
+
+def iter_main(db, name, ids=()):
+    entity = schema[name]
+    joins = [name]
+    tables = set([name])
+    columns = ['%s.id' % (name,)]
+    names = []
+    for field in entity.iter_single_fields():
+        table = name
+        column = field.column
+        while column.foreign is not None:
+            foreign_table = table + '__' + column.name + '__' + column.foreign.table
+            if foreign_table not in tables:
+                joins.append('JOIN %(parent)s AS %(label)s ON %(label)s.%(child)s = %(child)s.id' % dict(
+                    parent=column.foreign.table, child=table, label=foreign_table))
+                tables.add(foreign_table)
+            table = foreign_table
+            column = column.foreign
+        columns.append('%s.%s' % (table, column.name))
+        names.append(field.name)
+
+    query = generate_iter_query(columns, joins, ids)
+
+    cursor = db.cursor()
+    cursor.execute(query, ids)
+
+    for row in cursor:
+        id = row[0]
+        fields = [E.field(name, name='kind')]
+        for name, value in zip(names, row[1:]):
+            if isinstance(value, str):
+                value = value.decode('utf8')
+            fields.append(E.field(value, name=name))
+        yield id, fields
+
+
+def iter_sub(db, name, subtable, ids=()):
+    entity = schema[name]
+    joins = []
+    tables = set()
+    columns = []
+    names = []
+    for field in entity.iter_multi_fields():
+        if field.column.table != subtable:
+            continue
+        last_column = column = field.column
+        table = column.table
+        while True:
+            if last_column is column:
+                if table not in tables:
+                    joins.append(table)
+                    tables.add(table)
+                    columns.append('%s.%s' % (table, name))
+            else:
+                foreign_table = table + '__' + last_column.name + '__' + column.table
+                if foreign_table not in tables:
+                    joins.append('JOIN %(parent)s AS %(label)s ON %(label)s.id = %(child)s.%(child_column)s' % dict(
+                        parent=column.table, child=table, child_column=column.name, label=foreign_table))
+                    tables.add(foreign_table)
+                table = foreign_table
+            if column.foreign is None:
+                break
+            last_column = column
+            column = column.foreign
+        columns.append('%s.%s' % (table, column.name))
+        names.append(field.name)
+
+    query = generate_iter_query(columns, joins, ids)
+
+    cursor = db.cursor()
+    cursor.execute(query, ids)
+
+    fields = []
+    last_id = None
+    for row in cursor:
+        id = row[0]
+        if last_id != id:
+            if values:
+                yield last_id, fields
+            last_id = id
+            fields = []
+        for name, value in zip(fields, row[1:]):
+            if isinstance(value, str):
+                value = value.decode('utf8')
+            fields.append(E.field(value, name=name))
+    if values:
+        yield last_id, fields
 
 
 def placeholders(ids):
