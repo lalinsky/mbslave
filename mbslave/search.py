@@ -73,6 +73,7 @@ schema = Schema([
     Entity('label', [
         Field('id', Column('gid')),
         Field('disambiguation', Column('comment')),
+        Field('code', Column('label_code')),
         Field('name', Column('name', ForeignColumn('label_name', 'name'))),
         Field('sort_name', Column('sort_name', ForeignColumn('label_name', 'name'))),
         Field('country', Column('country', ForeignColumn('country', 'name', null=True))),
@@ -105,6 +106,7 @@ schema = Schema([
         Field('barcode', Column('barcode')),
         Field('name', Column('name', ForeignColumn('release_name', 'name'))),
         Field('status', Column('status', ForeignColumn('release_status', 'name', null=True))),
+        Field('type', Column('release_group', ForeignColumn('release_group', 'type', ForeignColumn('release_group_primary_type', 'name', null=True)))),
         Field('artist', Column('artist_credit', ForeignColumn('artist_credit', 'name', ForeignColumn('artist_name', 'name')))),
         MultiField('catno', ForeignColumn('release_label', 'catalog_number')),
         MultiField('label', ForeignColumn('release_label', 'label', ForeignColumn('label', 'name', ForeignColumn('label_name', 'name')))),
@@ -156,6 +158,7 @@ def iter_main(db, kind, ids=()):
         names.append(field.name)
 
     query = generate_iter_query(columns, joins, ids)
+    #print query
 
     cursor = db.cursor()
     cursor.execute(query, ids)
@@ -204,6 +207,7 @@ def iter_sub(db, kind, subtable, ids=()):
         names.append(field.name)
 
     query = generate_iter_query(columns, joins, ids)
+    #print query
 
     cursor = db.cursor()
     cursor.execute(query, ids)
@@ -230,96 +234,6 @@ def placeholders(ids):
     return ", ".join(["%s" for i in ids])
 
 
-def iter_list(db, query, field, ids=()):
-    cursor = db.cursor()
-    cursor.execute(query, ids)
-    last_id = None
-    values = None
-    for id, value in cursor:
-        if last_id != id:
-            if values:
-                yield {'_id': last_id, field: values}
-            last_id = id
-            values = []
-        values.append(value)
-    if values:
-        yield {'_id': last_id, field: values}
-
-
-def iter_ipi(db, entity, ids=()):
-    query = """
-        SELECT %(entity)s, ipi
-        FROM %(entity)s_ipi
-    """ % dict(entity=entity)
-    if ids:
-        ids = tuple(set(ids))
-        query += " WHERE %s IN (%s)" % (entity, placeholders(ids))
-    query += " ORDER BY %s" % (entity,)
-    return iter_list(db, query, 'ipi', ids)
-
-
-def iter_iswc(db, ids=()):
-    query = "SELECT work, iswc FROM iswc"
-    if ids:
-        ids = tuple(set(ids))
-        query += " WHERE work IN (%s)" % (placeholders(ids),)
-    query += " ORDER BY work"
-    return iter_list(db, query, 'iswc', ids)
-
-
-def iter_aliases(db, entity, ids=()):
-    query = """
-        SELECT a.%(entity)s, an.name
-        FROM %(entity)s_alias a
-        JOIN %(entity)s_name an ON a.name=an.id
-    """ % dict(entity=entity)
-    if ids:
-        ids = tuple(set(ids))
-        query += " WHERE a.%s IN (%s)" % (entity, placeholders(ids))
-    query += " ORDER BY a.%s" % (entity,)
-    cursor = db.cursor()
-    cursor.execute(query, ids)
-    last_id = None
-    aliases = None
-    for id, alias in cursor:
-        if last_id != id:
-            if aliases:
-                yield {'_id': last_id, 'aliases': aliases}
-            last_id = id
-            aliases = []
-        aliases.append(alias)
-    if aliases:
-        yield {'_id': last_id, 'aliases': aliases}
-
-
-def iter_artists(db, ids=()):
-    query = """
-        SELECT
-            a.id AS _id,
-            a.gid AS id,
-            a.comment AS disambiguation,
-            an.name AS name,
-            asn.name AS sortname,
-            at.name AS type,
-            c.name AS country,
-            c.iso_code AS country_code,
-            g.name AS gender
-        FROM artist a
-        JOIN artist_name an ON a.name=an.id
-        JOIN artist_name asn ON a.sort_name=asn.id
-        LEFT JOIN artist_type at ON a.type=at.id
-        LEFT JOIN country c ON a.country=c.id
-        LEFT JOIN gender g ON a.gender=g.id
-    """
-    if ids:
-        ids = tuple(set(ids))
-        query += " WHERE a.id IN (%s)" % placeholders(ids)
-    query += " ORDER BY a.id"
-    cursor = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cursor.execute(query, ids)
-    return cursor
-
-
 def grab_next(iter):
     try:
         return iter.next()
@@ -338,18 +252,6 @@ def merge(main, *extra):
         yield E.doc(*fields)
 
 
-def add_country_fields(fields, name, code):
-    fields.append(E.field(name.decode('utf8'), name='country'))
-    fields.append(E.field(code, name='country'))
-    if code == 'GB':
-        fields.append(E.field('UK', name='country'))
-
-
-def add_list_fields(fields, values, name):
-    for value in values:
-        fields.append(E.field(value.decode('utf8'), name=name))
-
-
 def fetch_entities(db, kind, ids=()):
     sources = [iter_main(db, kind, ids)]
     subtables = set()
@@ -361,256 +263,27 @@ def fetch_entities(db, kind, ids=()):
 
 
 def fetch_artists(db, ids=()):
-    iter = merge(iter_artists(db, ids), iter_aliases(db, 'artist', ids), iter_ipi(db, 'artist', ids))
-    for row in iter:
-        fields = [
-            E.field('artist', name='kind'),
-            E.field(row['id'], name='id'),
-            E.field(row['name'].decode('utf8'), name='name'),
-            E.field(row['sortname'].decode('utf8'), name='sortname'),
-        ]
-        if row['disambiguation']:
-            fields.append(E.field(row['disambiguation'].decode('utf8'), name='disambiguation'))
-        if row['type']:
-            fields.append(E.field(row['type'], name='type'))
-        if row['gender']:
-            fields.append(E.field(row['gender'], name='gender'))
-        if row['country']:
-            add_country_fields(fields, row['country'], row['country_code'])
-        if 'aliases' in row and row['aliases']:
-            add_list_fields(fields, row['aliases'], 'alias')
-        if 'ipi' in row and row['ipi']:
-            add_list_fields(fields, row['ipi'], 'ipi')
-        yield E.doc(*fields)
-
-
-def iter_labels(db, ids=()):
-    query = """
-        SELECT
-            l.id AS _id,
-            l.gid AS id,
-            l.comment AS disambiguation,
-            ln.name AS name,
-            lsn.name AS sortname,
-            lt.name AS type,
-            c.name AS country,
-            c.iso_code AS country_code,
-            l.label_code AS code
-        FROM label l
-        JOIN label_name ln ON l.name=ln.id
-        JOIN label_name lsn ON l.sort_name=lsn.id
-        LEFT JOIN label_type lt ON l.type=lt.id
-        LEFT JOIN country c ON l.country=c.id
-    """
-    if ids:
-        ids = tuple(set(ids))
-        query += " WHERE l.id IN (%s)" % placeholders(ids)
-    query += " ORDER BY l.id"
-    cursor = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cursor.execute(query, ids)
-    return cursor
+    return fetch_entities(db, 'artist', ids)
 
 
 def fetch_labels(db, ids=()):
-    iter = merge(iter_labels(db, ids), iter_aliases(db, 'label', ids), iter_ipi(db, 'label', ids))
-    for row in iter:
-        fields = [
-            E.field('label', name='kind'),
-            E.field(row['id'], name='id'),
-            E.field(row['name'].decode('utf8'), name='name'),
-            E.field(row['sortname'].decode('utf8'), name='sortname'),
-        ]
-        if row['disambiguation']:
-            fields.append(E.field(row['disambiguation'].decode('utf8'), name='disambiguation'))
-        if row['type']:
-            fields.append(E.field(row['type'], name='type'))
-        if row['country']:
-            add_country_fields(fields, row['country'], row['country_code'])
-        if row['code']:
-            fields.append(E.field('LC-%04d' % row['code'], name='code'))
-            fields.append(E.field('LC%04d' % row['code'], name='code'))
-        if 'aliases' in row and row['aliases']:
-            add_list_fields(fields, row['aliases'], 'alias')
-        if 'ipi' in row and row['ipi']:
-            add_list_fields(fields, row['ipi'], 'ipi')
-        yield E.doc(*fields)
+    return fetch_entities(db, 'label', ids)
 
 
 def fetch_release_groups(db, ids=()):
-    query = """
-        SELECT
-            rg.gid,
-            rgn.name,
-            rgt.name,
-            an.name
-        FROM release_group rg
-        JOIN release_name rgn ON rg.name = rgn.id
-        JOIN artist_credit ac ON rg.artist_credit = ac.id
-        JOIN artist_name an ON ac.name = an.id
-        LEFT JOIN release_group_type rgt ON rg.type = rgt.id
-    """
-    if ids:
-        ids = tuple(set(ids))
-        query += " WHERE rg.id IN (%s)" % placeholders(ids)
-    query += " ORDER BY rg.id"
-    cursor = db.cursor()
-    cursor.execute(query, ids)
-    for gid, name, type, artist in cursor:
-        fields = [
-            E.field('releasegroup', name='kind'),
-            E.field(gid, name='id'),
-            E.field(name.decode('utf8'), name='name'),
-            E.field(artist.decode('utf8'), name='artist'),
-        ]
-        if type:
-            fields.append(E.field(type, name='type'))
-        yield E.doc(*fields)
+    return fetch_entities(db, 'release_group', ids)
 
 
 def fetch_recordings(db, ids=()):
-    query = """
-        SELECT
-            r.gid,
-            rn.name,
-            an.name
-        FROM recording r
-        JOIN track_name rn ON r.name = rn.id
-        JOIN artist_credit ac ON r.artist_credit = ac.id
-        JOIN artist_name an ON ac.name = an.id
-    """
-    if ids:
-        ids = tuple(set(ids))
-        query += " WHERE r.id IN (%s)" % placeholders(ids)
-    query += " ORDER BY r.id"
-    cursor = db.cursor()
-    cursor.execute(query, ids)
-    for gid, name, artist in cursor:
-        fields = [
-            E.field('recording', name='kind'),
-            E.field(gid, name='id'),
-            E.field(name.decode('utf8'), name='name'),
-            E.field(artist.decode('utf8'), name='artist'),
-        ]
-        yield E.doc(*fields)
-
-
-def iter_release_labels(db, ids=()):
-    query = """
-        SELECT rl.release, rl.catalog_number, ln.name
-        FROM release_label rl
-        LEFT JOIN label l ON rl.label = l.id
-        LEFT JOIN label_name ln ON l.name = ln.id
-    """
-    if ids:
-        ids = tuple(set(ids))
-        query += " WHERE rl.release IN (%s)" % (placeholders(ids),)
-    query += " ORDER BY rl.release"
-    cursor = db.cursor()
-    cursor.execute(query, ids)
-    last_id = None
-    catnos = set()
-    labels = set()
-    for id, catno, label in cursor:
-        if last_id != id:
-            if catnos or labels:
-                yield {'_id': last_id, 'catnos': catnos, 'labels': labels}
-            last_id = id
-            catnos = set()
-            labels = set()
-        if catno:
-            catnos.add(catno)
-        if label:
-            labels.add(label)
-    if catnos or labels:
-        yield {'_id': last_id, 'catnos': catnos, 'labels': labels}
-
-
-def iter_releases(db, ids=()):
-    query = """
-        SELECT
-            r.id AS _id,
-            r.gid AS id,
-            rn.name AS name,
-            rgt.name AS type,
-            rs.name AS status,
-            an.name AS artist,
-            r.barcode AS barcode
-        FROM release r
-        JOIN release_name rn ON r.name = rn.id
-        JOIN artist_credit ac ON r.artist_credit = ac.id
-        JOIN artist_name an ON ac.name = an.id
-        JOIN release_group rg ON r.release_group = rg.id
-        LEFT JOIN release_group_type rgt ON rg.type = rgt.id
-        LEFT JOIN release_status rs ON r.status = rs.id
-    """
-    if ids:
-        ids = tuple(set(ids))
-        query += " WHERE r.id IN (%s)" % placeholders(ids)
-    query += " ORDER BY r.id"
-    cursor = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cursor.execute(query, ids)
-    return cursor
+    return fetch_entities(db, 'recording', ids)
 
 
 def fetch_releases(db, ids=()):
-    iter = merge(iter_releases(db, ids), iter_release_labels(db, ids))
-    for row in iter:
-        fields = [
-            E.field('release', name='kind'),
-            E.field(row['id'], name='id'),
-            E.field(row['name'].decode('utf8'), name='name'),
-            E.field(row['artist'].decode('utf8'), name='artist'),
-        ]
-        if row['type']:
-            fields.append(E.field(row['type'], name='type'))
-        if row['status']:
-            fields.append(E.field(row['status'], name='status'))
-        if row['barcode']:
-            fields.append(E.field(row['barcode'], name='barcode'))
-        if 'catnos' in row and row['catnos']:
-            for catno in row['catnos']:
-                fields.append(E.field(catno.decode('utf8'), name='catno'))
-        if 'labels' in row and row['labels']:
-            for label in row['labels']:
-                fields.append(E.field(label.decode('utf8'), name='label'))
-        yield E.doc(*fields)
-
-
-def iter_works(db, ids=()):
-    query = """
-        SELECT
-            w.id AS _id,
-            w.gid AS id,
-            wn.name AS name,
-            wt.name AS type
-        FROM work w
-        JOIN work_name wn ON w.name = wn.id
-        LEFT JOIN work_type wt ON w.type = wt.id
-    """
-    if ids:
-        ids = tuple(set(ids))
-        query += " WHERE w.id IN (%s)" % placeholders(ids)
-    query += " ORDER BY w.id"
-    cursor = db.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cursor.execute(query, ids)
-    return cursor
+    return fetch_entities(db, 'release', ids)
 
 
 def fetch_works(db, ids=()):
-    iter = merge(iter_works(db, ids), iter_aliases(db, 'work', ids), iter_iswc(db, ids))
-    for row in iter:
-        fields = [
-            E.field('work', name='kind'),
-            E.field(row['id'], name='id'),
-            E.field(row['name'].decode('utf8'), name='name'),
-        ]
-        if row['type']:
-            fields.append(E.field(row['type'].decode('utf8'), name='type'))
-        if 'aliases' in row and row['aliases']:
-            add_list_fields(fields, row['aliases'], 'alias')
-        if 'iswc' in row and row['iswc']:
-            add_list_fields(fields, row['iswc'], 'iswc')
-        yield E.doc(*fields)
+    return fetch_entities(db, 'work', ids)
 
 
 def fetch_all(cfg, db):
