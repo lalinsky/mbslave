@@ -13,10 +13,11 @@ def update_search_path(m):
     return m.group(1) + ', '.join(schemas) + ';'
 
 def update_schema(m):
-    return config.schema.name(m.group(1)) + '.'
+    return m.group(1) + config.schema.name(m.group(2)) + m.group(3)
 
 for line in sys.stdin:
     line = re.sub(r'(SET search_path = )(.+?);', update_search_path, line)
-    line = re.sub(r'\b(\w+)\.', update_schema, line)
+    line = re.sub(r'(\b)(\w+)(\.)', update_schema, line)
+    line = re.sub(r'( SCHEMA )(\w+)(;)', update_schema, line)
     sys.stdout.write(line)
 
