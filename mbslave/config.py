@@ -41,6 +41,19 @@ class MonitoringConfig(object):
             self.status_file = parser.get(section, 'status_file')
 
 
+class SchemasConfig(object):
+
+    def __init__(self):
+        self.mapping = {}
+
+    def name(self, name):
+        return self.mapping.get(name, name)
+
+    def parse(self, parser, section):
+        for name, value in parser.items(section):
+            self.mapping[name] = value
+
+
 class Config(object):
 
     def __init__(self, path):
@@ -50,13 +63,15 @@ class Config(object):
         self.get = self.cfg.get
         self.has_option = self.cfg.has_option
         self.database = ConfigSection()
-        self.database.schema = self.cfg.get('DATABASE', 'schema')
         self.solr = SolrConfig()
         if self.cfg.has_section('solr'):
             self.solr.parse(self.cfg, 'solr')
         self.monitoring = MonitoringConfig()
         if self.cfg.has_section('monitoring'):
             self.monitoring.parse(self.cfg, 'monitoring')
+        self.schema = SchemasConfig()
+        if self.cfg.has_section('schemas'):
+            self.schema.parse(self.cfg, 'schemas')
 
     def make_psql_args(self):
         opts = {}

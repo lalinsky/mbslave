@@ -4,7 +4,6 @@ port=5432
 name=musicbrainz
 user=musicbrainz
 #password=
-schema=musicbrainz
 
 [MUSICBRAINZ]
 base_url=http://ftp.musicbrainz.org/pub/musicbrainz/data/replication/
@@ -12,6 +11,12 @@ base_url=http://ftp.musicbrainz.org/pub/musicbrainz/data/replication/
 [TABLES]
 ignore=
 #ignore=tracklist_index
+
+[schemas]
+musicbrainz=musicbrainz
+statistics=musicbrainz
+reports=musicbrainz
+cover_art_archive=musicbrainz
 
 [solr]
 enabled=no

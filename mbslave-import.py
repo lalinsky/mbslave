@@ -1,49 +1,40 @@
 #!/usr/bin/env python
 
-import ConfigParser
-import psycopg2
 import tarfile
 import sys
 import os
+from mbslave import Config, connect_db, parse_name, check_table_exists, fqn
 
 
-def load_tar(filename, db, schema, ignored_tables):
+def load_tar(filename, db, config, ignored_tables):
     print "Importing data from", filename
     tar = tarfile.open(filename, 'r:bz2')
     cursor = db.cursor()
     for member in tar:
         if not member.name.startswith('mbdump/'):
             continue
-        table = member.name.split('/')[1].replace('_sanitised', '')
-        fulltable = schema + "." + table
+        name = member.name.split('/')[1].replace('_sanitised', '')
+        schema, table = parse_name(config, name)
+        fulltable = fqn(schema, table)
         if table in ignored_tables:
-            print " - Ignoring", fulltable
+            print " - Ignoring", name
+            continue
+        if not check_table_exists(db, schema, table):
+            print " - Skipping %s (table %s does not exist)" % (name, fulltable)
             continue
         cursor.execute("SELECT 1 FROM %s LIMIT 1" % fulltable)
         if cursor.fetchone():
-            print " - Skipping", fulltable, "(already contains data)"
+            print " - Skipping %s (table %s already contains data)" % (name, fulltable)
             continue
-        print " - Loading", fulltable
+        print " - Loading %s to %s" % (name, fulltable)
         cursor.copy_from(tar.extractfile(member), fulltable)
         db.commit()
 
 
-config = ConfigParser.RawConfigParser()
-config.read(os.path.dirname(__file__) + '/mbslave.conf')
+config = Config(os.path.dirname(__file__) + '/mbslave.conf')
+db = connect_db(config)
 
-opts = {}
-opts['database'] = config.get('DATABASE', 'name')
-opts['user'] = config.get('DATABASE', 'user')
-if config.has_option('DATABASE', 'password'):
-	opts['password'] = config.get('DATABASE', 'password')
-if config.has_option('DATABASE', 'host'):
-	opts['host'] = config.get('DATABASE', 'host')
-if config.has_option('DATABASE', 'port'):
-	opts['port'] = config.get('DATABASE', 'port')
-db = psycopg2.connect(**opts)
-
-schema = config.get('DATABASE', 'schema')
 ignored_tables = set(config.get('TABLES', 'ignore').split(','))
 for filename in sys.argv[1:]:
-    load_tar(filename, db, schema, ignored_tables)
+    load_tar(filename, db, config, ignored_tables)
 

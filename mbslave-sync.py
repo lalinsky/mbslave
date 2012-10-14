@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import ConfigParser
 import psycopg2
 import tarfile
 import sys
