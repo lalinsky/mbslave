@@ -27,6 +27,8 @@ user to user.
     ```sh
     echo 'CREATE SCHEMA musicbrainz;' | ./mbslave-psql.py -S
     sed 's/CUBE/TEXT/' sql/CreateTables.sql | ./mbslave-psql.py
+    ./mbslave-remap-schema.py <sql/statistics/CreateTables.sql | ./mbslave-psql.py
+    ./mbslave-remap-schema.py <sql/caa/CreateTables.sql | ./mbslave-psql.py
     ```
 
  3. Download the MusicBrainz database dump files from
@@ -42,7 +44,17 @@ user to user.
 
     ```sh
     ./mbslave-psql.py <sql/CreatePrimaryKeys.sql
+    ./mbslave-remap-schema.py <sql/statistics/CreatePrimaryKeys.sql | ./mbslave-psql.py
+    ./mbslave-remap-schema.py <sql/caa/CreatePrimaryKeys.sql | ./mbslave-psql.py
+	```
+
+    ```sh
     grep -vE '(collate|page_index|tracklist_index)' sql/CreateIndexes.sql | ./mbslave-psql.py
+    ./mbslave-remap-schema.py <sql/statistics/CreatePrimaryKeys.sql | ./mbslave-psql.py
+    ./mbslave-remap-schema.py <sql/caa/CreatePrimaryKeys.sql | ./mbslave-psql.py
+	```
+
+    ```sh
     ./mbslave-psql.py <sql/CreateSimpleViews.sql
     ```
 
