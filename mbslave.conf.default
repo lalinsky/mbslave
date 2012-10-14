@@ -1,5 +1,5 @@
 [DATABASE]
-host=localhost
+host=127.0.0.1
 port=5432
 name=musicbrainz
 user=musicbrainz
@@ -14,9 +14,8 @@ ignore=
 
 [schemas]
 musicbrainz=musicbrainz
-statistics=musicbrainz
-reports=musicbrainz
-cover_art_archive=musicbrainz
+statistics=statistics
+cover_art_archive=cover_art_archive
 
 [solr]
 enabled=no

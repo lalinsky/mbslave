@@ -21,12 +21,13 @@ user to user.
     createlang plpgsql musicbrainz
     ```
 
- 2. Prepare empty schema for the MusicBrainz database (skip this if you
-    want to use the default `public` schema) and create the table structure:
+ 2. Prepare empty schemas for the MusicBrainz database and create the table structure:
 
     ```sh
     echo 'CREATE SCHEMA musicbrainz;' | ./mbslave-psql.py -S
-    sed 's/CUBE/TEXT/' sql/CreateTables.sql | ./mbslave-psql.py
+    echo 'CREATE SCHEMA statistics;' | ./mbslave-psql.py -S
+    echo 'CREATE SCHEMA cover_art_archive;' | ./mbslave-psql.py -S
+    ./mbslave-remap-schema.py <sql/CreateTables.sql | sed 's/CUBE/TEXT/' | ./mbslave-psql.py
     ./mbslave-remap-schema.py <sql/statistics/CreateTables.sql | ./mbslave-psql.py
     ./mbslave-remap-schema.py <sql/caa/CreateTables.sql | ./mbslave-psql.py
     ```
@@ -43,19 +44,19 @@ user to user.
  5. Setup primary keys, indexes and views:
 
     ```sh
-    ./mbslave-psql.py <sql/CreatePrimaryKeys.sql
+    ./mbslave-remap-schema.py <CreatePrimaryKeys.sql | ./mbslave-psql.py
     ./mbslave-remap-schema.py <sql/statistics/CreatePrimaryKeys.sql | ./mbslave-psql.py
     ./mbslave-remap-schema.py <sql/caa/CreatePrimaryKeys.sql | ./mbslave-psql.py
 	```
 
     ```sh
-    grep -vE '(collate|page_index|tracklist_index)' sql/CreateIndexes.sql | ./mbslave-psql.py
-    ./mbslave-remap-schema.py <sql/statistics/CreatePrimaryKeys.sql | ./mbslave-psql.py
-    ./mbslave-remap-schema.py <sql/caa/CreatePrimaryKeys.sql | ./mbslave-psql.py
+    ./mbslave-remap-schema.py <sql/CreateIndexes.sql | grep -vE '(collate|page_index|tracklist_index)' | ./mbslave-psql.py
+    ./mbslave-remap-schema.py <sql/statistics/CreateIndexes.sql | ./mbslave-psql.py
+    ./mbslave-remap-schema.py <sql/caa/CreateIndexes.sql | ./mbslave-psql.py
 	```
 
     ```sh
-    ./mbslave-psql.py <sql/CreateSimpleViews.sql
+    ./mbslave-remap-schema.py <sql/CreateSimpleViews.sql | ./mbslave-psql.py
     ```
 
  6. Vacuum the newly created database (optional)
