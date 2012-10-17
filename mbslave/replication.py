@@ -1,3 +1,5 @@
+import datetime
+import shutil
 
 class ReplicationHook(object):
 
@@ -5,27 +7,29 @@ class ReplicationHook(object):
         self.cfg = cfg
         self.db = db
         self.schema = schema
+        self.logging = cfg.has_option('LOGGING', 'directory')
+
+        if self.logging:
+            time = datetime.datetime.today().strftime('%Y-%m-%d-%H%M%S')
+            directory = cfg.get('LOGGING', 'directory')
+            self.logfile = '%s/mbslave-%s.log' % (directory,time) 
+            self.logtmp = self.logfile + '.tmp'
 
     def begin(self, seq):
-        pass
-
-    def after_commit(self):
-        pass
-
-    def before_commit(self):
-        pass
-
-    def after_commit(self):
-        pass
+        self.log = open(self.logtmp, 'w')
+        print 'Logging to %s' % self.logfile
 
     def before_delete(self, table, keys):
-        pass
-
+        if self.logging:
+            self.log.write('delete;%s;%s\n' % (table,repr(keys)))
+        
     def before_update(self, table, keys, values):
-        pass
-
+        if self.logging:
+            self.log.write('update;%s;%s\n' % (table,repr(values)))
+        
     def before_insert(self, table, values):
-        pass
+        if self.logging:
+            self.log.write('insert;%s;%s\n' % (table,repr(values)))
 
     def after_delete(self, table, keys):
         pass
@@ -35,4 +39,12 @@ class ReplicationHook(object):
 
     def after_insert(self, table, values):
         pass
+
+    def before_commit(self):
+        pass
+
+    def after_commit(self):
+        if self.logging:
+            self.log.close()
+            shutil.move(self.logtmp, self.logfile)
 
