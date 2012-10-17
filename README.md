@@ -21,12 +21,15 @@ user to user.
     createlang plpgsql musicbrainz
     ```
 
- 2. Prepare empty schema for the MusicBrainz database (skip this if you
-    want to use the default `public` schema) and create the table structure:
+ 2. Prepare empty schemas for the MusicBrainz database and create the table structure:
 
     ```sh
     echo 'CREATE SCHEMA musicbrainz;' | ./mbslave-psql.py -S
-    sed 's/CUBE/TEXT/' sql/CreateTables.sql | ./mbslave-psql.py
+    echo 'CREATE SCHEMA statistics;' | ./mbslave-psql.py -S
+    echo 'CREATE SCHEMA cover_art_archive;' | ./mbslave-psql.py -S
+    ./mbslave-remap-schema.py <sql/CreateTables.sql | sed 's/CUBE/TEXT/' | ./mbslave-psql.py
+    ./mbslave-remap-schema.py <sql/statistics/CreateTables.sql | ./mbslave-psql.py
+    ./mbslave-remap-schema.py <sql/caa/CreateTables.sql | ./mbslave-psql.py
     ```
 
  3. Download the MusicBrainz database dump files from
@@ -41,9 +44,19 @@ user to user.
  5. Setup primary keys, indexes and views:
 
     ```sh
-    ./mbslave-psql.py <sql/CreatePrimaryKeys.sql
-    grep -vE '(collate|page_index|tracklist_index)' sql/CreateIndexes.sql | ./mbslave-psql.py
-    ./mbslave-psql.py <sql/CreateSimpleViews.sql
+    ./mbslave-remap-schema.py <CreatePrimaryKeys.sql | ./mbslave-psql.py
+    ./mbslave-remap-schema.py <sql/statistics/CreatePrimaryKeys.sql | ./mbslave-psql.py
+    ./mbslave-remap-schema.py <sql/caa/CreatePrimaryKeys.sql | ./mbslave-psql.py
+	```
+
+    ```sh
+    ./mbslave-remap-schema.py <sql/CreateIndexes.sql | grep -vE '(collate|page_index|tracklist_index)' | ./mbslave-psql.py
+    ./mbslave-remap-schema.py <sql/statistics/CreateIndexes.sql | ./mbslave-psql.py
+    ./mbslave-remap-schema.py <sql/caa/CreateIndexes.sql | ./mbslave-psql.py
+	```
+
+    ```sh
+    ./mbslave-remap-schema.py <sql/CreateSimpleViews.sql | ./mbslave-psql.py
     ```
 
  6. Vacuum the newly created database (optional)
@@ -128,6 +141,44 @@ grep 'CREATE VIEW' sql/CreateSimpleViews.sql | sed 's/CREATE/DROP/' | sed 's/ AS
 ./mbslave-psql.py <sql/updates/20120508-unknown-end-dates.sql
 ./mbslave-psql.py <sql/CreateSimpleViews.sql
 echo "UPDATE replication_control SET current_schema_sequence = 15;" | ./mbslave-psql.py
+```
+
+### Release 2012-10-15
+
+This release introduces two new database schemas. You can decide whether you want
+to have the three schemas in your database, or if you want to merge them. For this
+you need to update your `mbslave.conf` configuration file. The rest of the guide
+will assume that you will keep have all schemas.
+
+Create the cover_art_archive schema:
+
+```sh
+echo 'CREATE SCHEMA cover_art_archive;' | ./mbslave-psql.py -S
+./mbslave-remap-schema.py <sql/caa/CreateTables.sql | ./mbslave-psql.py
+wget http://ftp.musicbrainz.org/pub/musicbrainz/data/schema-change-2012-10-15/mbdump-cover-art-archive.tar.bz2
+./mbslave-import.py mbdump-cover-art-archive.tar.bz2
+./mbslave-remap-schema.py <sql/caa/CreatePrimaryKeys.sql | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/caa/CreateIndexes.sql | ./mbslave-psql.py
+```
+
+Move tables to the statistics schema:
+
+```sh
+./mbslave-remap-schema.py <sql/updates/20120922-move-statistics-tables.sql | ./mbslave.py
+```
+
+Upgrade the musicbrainz schema:
+
+```sh
+grep 'CREATE VIEW' sql/CreateSimpleViews.sql | sed 's/CREATE/DROP/' | sed 's/ AS/;/' | ./mbslave-psql.py
+./mbslave-psql.py <sql/updates/20120220-merge-duplicate-credits.sql
+./mbslave-psql.py <sql/updates/20120822-more-text-constraints.sql
+./mbslave-psql.py <sql/updates/20120917-rg-st-created.sql
+./mbslave-psql.py <sql/updates/20120921-drop-url-descriptions.sql
+./mbslave-psql.py <sql/updates/20120927-add-log-statistics.sql
+./mbslave-psql.py <sql/updates/20120911-not-null-comments.sql
+./mbslave-psql.py <sql/CreateSimpleViews.sql
+echo "UPDATE replication_control SET current_schema_sequence = 16;" | ./mbslave-psql.py
 ```
 
 ## Solr Search Index (Work-In-Progress)

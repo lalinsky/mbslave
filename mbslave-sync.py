@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import ConfigParser
 import psycopg2
 import tarfile
 import sys
@@ -9,7 +8,7 @@ import re
 import urllib2
 import shutil
 import tempfile
-from mbslave import Config, ReplicationHook, connect_db
+from mbslave import Config, ReplicationHook, connect_db, parse_name, fqn
 from mbslave.monitoring import StatusReport
 
 
@@ -50,11 +49,11 @@ def read_psql_dump(fp, types):
 
 class PacketImporter(object):
 
-    def __init__(self, db, schema, ignored_tables, replication_seq, hook):
+    def __init__(self, db, config, ignored_tables, replication_seq, hook):
         self._db = db
         self._data = {}
         self._transactions = {}
-        self._schema = schema
+        self._config = config
         self._ignored_tables = ignored_tables
         self._hook = hook
         self._replication_seq = replication_seq
@@ -67,9 +66,9 @@ class PacketImporter(object):
     def load_pending(self, fp):
         dump = read_psql_dump(fp, [int, str, str, int])
         for id, table, type, xid in dump:
-            table = table.split(".")[1].strip('"')
+            schema, table = parse_name(self._config, table)
             transaction = self._transactions.setdefault(xid, [])
-            transaction.append((id, table, type))
+            transaction.append((id, schema, table, type))
 
     def process(self):
         cursor = self._db.cursor()
@@ -79,10 +78,10 @@ class PacketImporter(object):
             transaction = self._transactions[xid]
             #print ' - Running transaction', xid
             #print 'BEGIN; --', xid
-            for id, table, type in sorted(transaction):
+            for id, schema, table, type in sorted(transaction):
                 if table in self._ignored_tables:
                     continue
-                fulltable = self._schema + '.' + table
+                fulltable = fqn(schema, table)
                 if fulltable not in stats:
                     stats[fulltable] = {'d': 0, 'u': 0, 'i': 0}
                 stats[fulltable][type] += 1
@@ -160,7 +159,6 @@ def download_packet(base_url, replication_seq):
 config = Config(os.path.dirname(__file__) + '/mbslave.conf')
 db = connect_db(config)
 
-schema = config.get('DATABASE', 'schema')
 base_url = config.get('MUSICBRAINZ', 'base_url')
 ignored_tables = set(config.get('TABLES', 'ignore').split(','))
 
@@ -171,7 +169,7 @@ else:
     hook_class = ReplicationHook
 
 cursor = db.cursor()
-cursor.execute("SELECT current_schema_sequence, current_replication_sequence FROM %s.replication_control" % schema)
+cursor.execute("SELECT current_schema_sequence, current_replication_sequence FROM %s.replication_control" % config.schema.name('musicbrainz'))
 schema_seq, replication_seq = cursor.fetchone()
 
 status = StatusReport(schema_seq, replication_seq)
@@ -180,13 +178,13 @@ if config.monitoring.enabled:
 
 while True:
     replication_seq += 1
-    hook = hook_class(config, db, schema)
+    hook = hook_class(config, db, config)
     tmp = download_packet(base_url, replication_seq)
     if tmp is None:
         print 'Not found, stopping'
         status.end()
         break
-    process_tar(tmp, db, schema, ignored_tables, schema_seq, replication_seq, hook)
+    process_tar(tmp, db, config, ignored_tables, schema_seq, replication_seq, hook)
     tmp.close()
     status.update(replication_seq)
 

@@ -1,10 +1,9 @@
 [DATABASE]
-host=localhost
+host=127.0.0.1
 port=5432
 name=musicbrainz
 user=musicbrainz
 #password=
-schema=musicbrainz
 
 [MUSICBRAINZ]
 base_url=http://ftp.musicbrainz.org/pub/musicbrainz/data/replication/
@@ -12,6 +11,11 @@ base_url=http://ftp.musicbrainz.org/pub/musicbrainz/data/replication/
 [TABLES]
 ignore=
 #ignore=tracklist_index
+
+[schemas]
+musicbrainz=musicbrainz
+statistics=statistics
+cover_art_archive=cover_art_archive
 
 [solr]
 enabled=no
