@@ -151,6 +151,9 @@ you need to update your `mbslave.conf` configuration file (see `mbslave.conf.dis
 for usage of the new options). The rest of the guide will assume that you will
 keep have all schemas.
 
+Reimporting your database from data dumps is the recommended approach, unless you
+are aware what changes were done in this release.
+
 The upgrade scripts for this release do not support PostgreSQL 8.4. If you are,
 using this or an older version of PostgreSQL, you have to drop your database
 and import from data dumps.
