@@ -147,16 +147,23 @@ echo "UPDATE replication_control SET current_schema_sequence = 15;" | ./mbslave-
 
 This release introduces two new database schemas. You can decide whether you want
 to have the three schemas in your database, or if you want to merge them. For this
-you need to update your `mbslave.conf` configuration file. The rest of the guide
-will assume that you will keep have all schemas.
+you need to update your `mbslave.conf` configuration file (see `mbslave.conf.dist`
+for usage of the new options). The rest of the guide will assume that you will
+keep have all schemas.
+
+The upgrade scripts for this release do not support PostgreSQL 8.4. If you are,
+using this or an older version of PostgreSQL, you have to drop your database
+and import from data dumps.
 
 Create the cover_art_archive schema:
 
 ```sh
 echo 'CREATE SCHEMA cover_art_archive;' | ./mbslave-psql.py -S
-./mbslave-remap-schema.py <sql/caa/CreateTables.sql | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20121015-caa-as-of-schema-15.sql | ./mbslave-psql.py
 wget http://ftp.musicbrainz.org/pub/musicbrainz/data/schema-change-2012-10-15/mbdump-cover-art-archive.tar.bz2
 ./mbslave-import.py mbdump-cover-art-archive.tar.bz2
+./mbslave-remap-schema.py <sql/updates/20120919-caa-edits-pending.sql | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20120921-release-group-cover-art.sql | ./mbslave-psql.py
 ./mbslave-remap-schema.py <sql/caa/CreatePrimaryKeys.sql | ./mbslave-psql.py
 ./mbslave-remap-schema.py <sql/caa/CreateIndexes.sql | ./mbslave-psql.py
 ```
@@ -164,18 +171,20 @@ wget http://ftp.musicbrainz.org/pub/musicbrainz/data/schema-change-2012-10-15/mb
 Move tables to the statistics schema:
 
 ```sh
-./mbslave-remap-schema.py <sql/updates/20120922-move-statistics-tables.sql | ./mbslave.py
+./mbslave-remap-schema.py <sql/updates/20120922-move-statistics-tables.sql | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20120927-add-log-statistics.sql | ./mbslave-psql.py
 ```
 
-Upgrade the musicbrainz schema:
+Upgrade the musicbrainz schema (not completely tested, if it doesn't work, please let me know):
 
 ```sh
-grep 'CREATE VIEW' sql/CreateSimpleViews.sql | sed 's/CREATE/DROP/' | sed 's/ AS/;/' | ./mbslave-psql.py
+grep 'VIEW' sql/CreateSimpleViews.sql | sed 's/CREATE OR REPLACE/DROP/' | sed 's/ AS/;/' | ./mbslave-psql.py
+./mbslave-psql.py <sql-extra/20121017-create-controlled-for-whitespace.sql
+./mbslave-psql.py <sql/SetSequences.sql 
 ./mbslave-psql.py <sql/updates/20120220-merge-duplicate-credits.sql
 ./mbslave-psql.py <sql/updates/20120822-more-text-constraints.sql
 ./mbslave-psql.py <sql/updates/20120917-rg-st-created.sql
 ./mbslave-psql.py <sql/updates/20120921-drop-url-descriptions.sql
-./mbslave-psql.py <sql/updates/20120927-add-log-statistics.sql
 ./mbslave-psql.py <sql/updates/20120911-not-null-comments.sql
 ./mbslave-psql.py <sql/CreateSimpleViews.sql
 echo "UPDATE replication_control SET current_schema_sequence = 16;" | ./mbslave-psql.py
