@@ -44,7 +44,7 @@ user to user.
  5. Setup primary keys, indexes and views:
 
     ```sh
-    ./mbslave-remap-schema.py <CreatePrimaryKeys.sql | ./mbslave-psql.py
+    ./mbslave-remap-schema.py <sql/CreatePrimaryKeys.sql | ./mbslave-psql.py
     ./mbslave-remap-schema.py <sql/statistics/CreatePrimaryKeys.sql | ./mbslave-psql.py
     ./mbslave-remap-schema.py <sql/caa/CreatePrimaryKeys.sql | ./mbslave-psql.py
 	```
