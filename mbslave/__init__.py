@@ -3,8 +3,11 @@ from mbslave.config import Config
 from mbslave.replication import ReplicationHook
 
 
-def connect_db(cfg):
-    return psycopg2.connect(**cfg.make_psql_args())
+def connect_db(cfg, set_search_path=False):
+    db = psycopg2.connect(**cfg.make_psql_args())
+    if set_search_path:
+        db.cursor().execute("SET search_path TO %s", (cfg.schema.name('musicbrainz'),))
+    return db
 
 
 def parse_name(config, table):

@@ -1,6 +1,7 @@
 import itertools
 import urllib2
 import psycopg2.extras
+from contextlib import closing
 from collections import namedtuple
 from lxml import etree as ET
 from lxml.builder import E
@@ -99,6 +100,7 @@ schema = Schema([
             ForeignColumn('release_group_secondary_type_join', 'secondary_type',
                 ForeignColumn('release_group_secondary_type', 'name'))),
         Field('artist', Column('artist_credit', ForeignColumn('artist_credit', 'name', ForeignColumn('artist_name', 'name')))),
+        MultiField('alias', ForeignColumn('release', 'name', ForeignColumn('release_name', 'name'))),
     ]),
     Entity('release', [
         Field('id', Column('gid')),
@@ -110,12 +112,14 @@ schema = Schema([
         Field('artist', Column('artist_credit', ForeignColumn('artist_credit', 'name', ForeignColumn('artist_name', 'name')))),
         MultiField('catno', ForeignColumn('release_label', 'catalog_number')),
         MultiField('label', ForeignColumn('release_label', 'label', ForeignColumn('label', 'name', ForeignColumn('label_name', 'name')))),
+        Field('alias', Column('release_group', ForeignColumn('release_group', 'name', ForeignColumn('release_name', 'name')))),
     ]),
     Entity('recording', [
         Field('id', Column('gid')),
         Field('disambiguation', Column('comment')),
-        Field('name', Column('name', ForeignColumn('recording_name', 'name'))),
+        Field('name', Column('name', ForeignColumn('track_name', 'name'))),
         Field('artist', Column('artist_credit', ForeignColumn('artist_credit', 'name', ForeignColumn('artist_name', 'name')))),
+        MultiField('alias', ForeignColumn('track', 'name', ForeignColumn('track_name', 'name'))),
     ]),
 ])
 
@@ -158,20 +162,24 @@ def iter_main(db, kind, ids=()):
         names.append(field.name)
 
     query = generate_iter_query(columns, joins, ids)
-    #print query
-
-    cursor = db.cursor()
-    cursor.execute(query, ids)
-
-    for row in cursor:
-        id = row[0]
-        fields = [E.field(kind, name='kind')]
-        for name, value in zip(names, row[1:]):
-            if isinstance(value, str):
-                value = value.decode('utf8')
-            if value:
-                fields.append(E.field(value, name=name))
-        yield id, fields
+    with closing(db.cursor('cursor_' + kind)) as cursor:
+        cursor.itersize = 100 * 1000
+        cursor.execute(query, ids)
+        for row in cursor:
+            id = row[0]
+            fields = [E.field(kind, name='kind')]
+            for name, value in zip(names, row[1:]):
+                if not value:
+                    continue
+                if isinstance(value, str):
+                    value = value.decode('utf8')
+                elif not isinstance(value, unicode):
+                    value = unicode(value)
+                try:
+                    fields.append(E.field(value, name=name))
+                except ValueError:
+                    continue # XXX
+            yield id, fields
 
 
 def iter_sub(db, kind, subtable, ids=()):
@@ -207,27 +215,31 @@ def iter_sub(db, kind, subtable, ids=()):
         names.append(field.name)
 
     query = generate_iter_query(columns, joins, ids)
-    #print query
-
-    cursor = db.cursor()
-    cursor.execute(query, ids)
-
-    fields = []
-    last_id = None
-    for row in cursor:
-        id = row[0]
-        if last_id != id:
-            if fields:
-                yield last_id, fields
-            last_id = id
-            fields = []
-        for name, value in zip(names, row[1:]):
-            if isinstance(value, str):
-                value = value.decode('utf8')
-            if value:
-                fields.append(E.field(value, name=name))
-    if fields:
-        yield last_id, fields
+    with closing(db.cursor('cursor_' + kind + '_' + subtable)) as cursor:
+        cursor.itersize = 100 * 1000
+        cursor.execute(query, ids)
+        fields = []
+        last_id = None
+        for row in cursor:
+            id = row[0]
+            if last_id != id:
+                if fields:
+                    yield last_id, fields
+                last_id = id
+                fields = []
+            for name, value in zip(names, row[1:]):
+                if not value:
+                    continue
+                if isinstance(value, str):
+                    value = value.decode('utf8')
+                elif not isinstance(value, unicode):
+                    value = unicode(value)
+                try:
+                    fields.append(E.field(value, name=name))
+                except ValueError:
+                    continue # XXX
+        if fields:
+            yield last_id, fields
 
 
 def placeholders(ids):
