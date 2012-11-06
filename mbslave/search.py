@@ -168,7 +168,7 @@ def generate_triggers():
                 table, column, values = generate_trigger_update(path[i:])
                 deps.setdefault(table, {}).setdefault((entity.name, 'NEW', 'id', values), []).append(column)
 
-        ins_del_deps.setdefault(entity.name, set()).add(entity.name)
+        ins_del_deps.setdefault(entity.name, set()).add((entity.name, 'id'))
 
         for field in entity.iter_multi_fields():
             column = field.column
@@ -185,19 +185,19 @@ def generate_triggers():
             deps.setdefault(field.column.table, {}).setdefault((entity.name, 'OLD', entity.name, None), []).append(entity.name)
 
             # Inserted or deleted new child row
-            ins_del_deps.setdefault(field.column.table, set()).add(entity.name)
+            ins_del_deps.setdefault(field.column.table, set()).add((entity.name, entity.name))
 
     for table, kinds in sorted(ins_del_deps.items()):
         sections = []
-        for kind in kinds:
-            sections.append("INSERT INTO mbslave.mbslave_solr_queue (entity_type, entity_id) VALUES ('%(kind)s', NEW.id);" % dict(kind=kind))
+        for kind, pk in kinds:
+            sections.append("INSERT INTO mbslave.mbslave_solr_queue (entity_type, entity_id) VALUES ('%s', NEW.%s);" % (kind, pk))
         code = '\n    '.join(sections)
         yield SQL_TRIGGER % dict(table=table, code=code, op1='ins', op2='INSERT')
 
     for table, kinds in sorted(ins_del_deps.items()):
         sections = []
-        for kind in kinds:
-            sections.append("INSERT INTO mbslave.mbslave_solr_queue (entity_type, entity_id) VALUES ('%(kind)s', OLD.id);" % dict(kind=kind))
+        for kind, pk in kinds:
+            sections.append("INSERT INTO mbslave.mbslave_solr_queue (entity_type, entity_id) VALUES ('%s', OLD.%s);" % (kind, pk))
         code = '\n    '.join(sections)
         yield SQL_TRIGGER % dict(table=table, code=code, op1='del', op2='DELETE')
 
