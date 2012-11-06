@@ -6,6 +6,7 @@ from mbslave import Config, connect_db
 
 parser = OptionParser()
 parser.add_option("-S", "--no-schema", action="store_true", dest="public", default=False, help="don't configure the default schema")
+parser.add_option("-s", "--schema", dest="schema", default='musicbrainz', help="default schema")
 options, args = parser.parse_args()
 
 config = Config(os.path.dirname(__file__) + '/mbslave.conf')
@@ -22,7 +23,7 @@ if config.has_option('DATABASE', 'port'):
 args.append(config.get('DATABASE', 'name'))
 
 if not options.public:
-    schema = config.schema.name('musicbrainz')
+    schema = config.schema.name(options.schema)
     os.environ['PGOPTIONS'] = '-c search_path=%s' % schema
 if config.has_option('DATABASE', 'password'):
 	os.environ['PGPASSWORD'] = config.get('DATABASE', 'password')
