@@ -127,6 +127,98 @@ schema = Schema([
 SQL_SELECT_TPL = "SELECT\n%(columns)s\nFROM\n%(joins)s\nORDER BY %(sort_column)s"
 
 
+SQL_TRIGGER = """
+CREATE OR REPLACE FUNCTION mbslave_solr_%(op1)s_%(table)s() RETURNS trigger AS $$
+BEGIN
+    %(code)s
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+"""
+#--CREATE TRIGGER mbslave_solr_tr_%(op1)s_%(table)s AFTER %(op2)s ON musicbrainz.%(table)s FOR EACH ROW EXECUTE PROCEDURE mbslave_solr_%(op1)s_%(table)s();
+
+
+def distinct_values(columns):
+    return ' OR\n       '.join('OLD.%(c)s IS DISTINCT FROM NEW.%(c)s' % dict(c=c)
+                               for c in columns)
+
+
+def generate_trigger_update(path):
+    condition = None
+    for table, column in path[1:]:
+        if not condition:
+            condition = 'FROM musicbrainz.%s WHERE %s = NEW.id' % (table, column)
+        else:
+            condition = 'FROM musicbrainz.%s WHERE %s IN (SELECT id %s)' % (table, column, condition)
+    return path[0][0], path[0][1], condition
+
+
+def generate_triggers():
+    ins_del_deps = {}
+    deps = {}
+    for entity in schema.entities:
+        for field in entity.iter_single_fields():
+            column = field.column
+            path = [(entity.name, column.name)]
+            while column.foreign:
+                column = column.foreign
+                path.insert(0, (column.table, column.name))
+            for i in range(0, len(path)):
+                table, column, values = generate_trigger_update(path[i:])
+                deps.setdefault(table, {}).setdefault((entity.name, 'NEW', 'id', values), []).append(column)
+
+        ins_del_deps.setdefault(entity.name, set()).add(entity.name)
+
+        for field in entity.iter_multi_fields():
+            column = field.column
+            path = []
+            while column:
+                path.insert(0, (column.table, column.name))
+                column = column.foreign
+            for i in range(0, len(path)):
+                table, column, values = generate_trigger_update(path[i:])
+                deps.setdefault(table, {}).setdefault((entity.name, 'NEW', entity.name, values), []).append(column)
+
+            # Changed parent row
+            deps.setdefault(field.column.table, {}).setdefault((entity.name, 'NEW', entity.name, None), []).append(entity.name)
+            deps.setdefault(field.column.table, {}).setdefault((entity.name, 'OLD', entity.name, None), []).append(entity.name)
+
+            # Inserted or deleted new child row
+            ins_del_deps.setdefault(field.column.table, set()).add(entity.name)
+
+    for table, kinds in sorted(ins_del_deps.items()):
+        sections = []
+        for kind in kinds:
+            sections.append("INSERT INTO mbslave.mbslave_solr_queue (entity_type, entity_id) VALUES ('%(kind)s', NEW.id);" % dict(kind=kind))
+        code = '\n    '.join(sections)
+        yield SQL_TRIGGER % dict(table=table, code=code, op1='ins', op2='INSERT')
+
+    for table, kinds in sorted(ins_del_deps.items()):
+        sections = []
+        for kind in kinds:
+            sections.append("INSERT INTO mbslave.mbslave_solr_queue (entity_type, entity_id) VALUES ('%(kind)s', OLD.id);" % dict(kind=kind))
+        code = '\n    '.join(sections)
+        yield SQL_TRIGGER % dict(table=table, code=code, op1='del', op2='DELETE')
+
+    for table, fields in sorted(deps.items()):
+        sections = []
+        for columns in set(map(tuple, fields.values())):
+            inserts = []
+            for (kind, ver, pk, values), c in fields.items():
+                if columns != tuple(c):
+                    continue
+                if not values:
+                    values = "VALUES ('%s', %s.%s)" % (kind, ver, pk)
+                else:
+                    values = "SELECT '%s', %s %s" % (kind, pk, values)
+                inserts.append("INSERT INTO mbslave.mbslave_solr_queue (entity_type, entity_id) %s;" % values)
+            sections.append("IF %s\n    THEN\n        %s\n    END IF;" % (distinct_values(columns), "\n        ".join(inserts)))
+        code = '\n    '.join(sections)
+        yield SQL_TRIGGER % dict(table=table, code=code, op1='upd', op2='UPDATE')
+
+
+
 def generate_iter_query(columns, joins, ids=()):
     id_column = columns[0]
     tpl = ["SELECT", "%(columns)s", "FROM", "%(joins)s"]
