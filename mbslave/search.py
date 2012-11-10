@@ -52,15 +52,16 @@ class Column(object):
 
 class ForeignColumn(Column):
 
-    def __init__(self, table, name, foreign=None, null=False):
+    def __init__(self, table, name, foreign=None, null=False, backref=None):
         super(ForeignColumn, self).__init__(name, foreign=foreign)
         self.table = table
         self.null = null
+        self.backref = backref
 
 
 schema = Schema([
     Entity('artist', [
-        Field('id', Column('gid')),
+        Field('mbid', Column('gid')),
         Field('disambiguation', Column('comment')),
         Field('name', Column('name', ForeignColumn('artist_name', 'name'))),
         Field('sort_name', Column('sort_name', ForeignColumn('artist_name', 'name'))),
@@ -68,11 +69,12 @@ schema = Schema([
         Field('country_code', Column('country', ForeignColumn('country', 'iso_code', null=True))),
         Field('gender', Column('gender', ForeignColumn('gender', 'name', null=True))),
         Field('type', Column('type', ForeignColumn('artist_type', 'name', null=True))),
+        MultiField('mbid', ForeignColumn('artist_gid_redirect', 'gid', backref='new_id')),
         MultiField('ipi', ForeignColumn('artist_ipi', 'ipi')),
         MultiField('alias', ForeignColumn('artist_alias', 'name', ForeignColumn('artist_name', 'name'))),
     ]),
     Entity('label', [
-        Field('id', Column('gid')),
+        Field('mbid', Column('gid')),
         Field('disambiguation', Column('comment')),
         Field('code', Column('label_code')),
         Field('name', Column('name', ForeignColumn('label_name', 'name'))),
@@ -80,22 +82,25 @@ schema = Schema([
         Field('country', Column('country', ForeignColumn('country', 'name', null=True))),
         Field('country_code', Column('country', ForeignColumn('country', 'iso_code', null=True))),
         Field('type', Column('type', ForeignColumn('label_type', 'name', null=True))),
+        MultiField('mbid', ForeignColumn('label_gid_redirect', 'gid', backref='new_id')),
         MultiField('ipi', ForeignColumn('label_ipi', 'ipi')),
         MultiField('alias', ForeignColumn('label_alias', 'name', ForeignColumn('label_name', 'name'))),
     ]),
     Entity('work', [
-        Field('id', Column('gid')),
+        Field('mbid', Column('gid')),
         Field('disambiguation', Column('comment')),
         Field('name', Column('name', ForeignColumn('work_name', 'name'))),
         Field('type', Column('type', ForeignColumn('work_type', 'name', null=True))),
+        MultiField('mbid', ForeignColumn('work_gid_redirect', 'gid', backref='new_id')),
         MultiField('iswc', ForeignColumn('iswc', 'iswc')),
         MultiField('alias', ForeignColumn('work_alias', 'name', ForeignColumn('work_name', 'name'))),
     ]),
     Entity('release_group', [
-        Field('id', Column('gid')),
+        Field('mbid', Column('gid')),
         Field('disambiguation', Column('comment')),
         Field('name', Column('name', ForeignColumn('release_name', 'name'))),
         Field('type', Column('type', ForeignColumn('release_group_primary_type', 'name', null=True))),
+        MultiField('mbid', ForeignColumn('release_group_gid_redirect', 'gid', backref='new_id')),
         MultiField('type',
             ForeignColumn('release_group_secondary_type_join', 'secondary_type',
                 ForeignColumn('release_group_secondary_type', 'name'))),
@@ -103,22 +108,24 @@ schema = Schema([
         MultiField('alias', ForeignColumn('release', 'name', ForeignColumn('release_name', 'name'))),
     ]),
     Entity('release', [
-        Field('id', Column('gid')),
+        Field('mbid', Column('gid')),
         Field('disambiguation', Column('comment')),
         Field('barcode', Column('barcode')),
         Field('name', Column('name', ForeignColumn('release_name', 'name'))),
         Field('status', Column('status', ForeignColumn('release_status', 'name', null=True))),
         Field('type', Column('release_group', ForeignColumn('release_group', 'type', ForeignColumn('release_group_primary_type', 'name', null=True)))),
         Field('artist', Column('artist_credit', ForeignColumn('artist_credit', 'name', ForeignColumn('artist_name', 'name')))),
+        MultiField('mbid', ForeignColumn('release_gid_redirect', 'gid', backref='new_id')),
         MultiField('catno', ForeignColumn('release_label', 'catalog_number')),
         MultiField('label', ForeignColumn('release_label', 'label', ForeignColumn('label', 'name', ForeignColumn('label_name', 'name')))),
         Field('alias', Column('release_group', ForeignColumn('release_group', 'name', ForeignColumn('release_name', 'name')))),
     ]),
     Entity('recording', [
-        Field('id', Column('gid')),
+        Field('mbid', Column('gid')),
         Field('disambiguation', Column('comment')),
         Field('name', Column('name', ForeignColumn('track_name', 'name'))),
         Field('artist', Column('artist_credit', ForeignColumn('artist_credit', 'name', ForeignColumn('artist_name', 'name')))),
+        MultiField('mbid', ForeignColumn('recording_gid_redirect', 'gid', backref='new_id')),
         MultiField('alias', ForeignColumn('track', 'name', ForeignColumn('track_name', 'name'))),
     ]),
 ])
@@ -135,8 +142,9 @@ BEGIN
 END;
 $$ LANGUAGE 'plpgsql';
 
+DROP TRIGGER IF EXISTS mbslave_solr_tr_%(op1)s_%(table)s ON musicbrainz.%(table)s;
+CREATE TRIGGER mbslave_solr_tr_%(op1)s_%(table)s AFTER %(op2)s ON musicbrainz.%(table)s FOR EACH ROW EXECUTE PROCEDURE mbslave_solr_%(op1)s_%(table)s();
 """
-#--CREATE TRIGGER mbslave_solr_tr_%(op1)s_%(table)s AFTER %(op2)s ON musicbrainz.%(table)s FOR EACH ROW EXECUTE PROCEDURE mbslave_solr_%(op1)s_%(table)s();
 
 
 def distinct_values(columns):
@@ -172,20 +180,21 @@ def generate_triggers():
 
         for field in entity.iter_multi_fields():
             column = field.column
+            backref = field.column.backref or entity.name
             path = []
             while column:
                 path.insert(0, (column.table, column.name))
                 column = column.foreign
             for i in range(0, len(path)):
                 table, column, values = generate_trigger_update(path[i:])
-                deps.setdefault(table, {}).setdefault((entity.name, 'NEW', entity.name, values), []).append(column)
+                deps.setdefault(table, {}).setdefault((entity.name, 'NEW', backref, values), []).append(column)
 
             # Changed parent row
-            deps.setdefault(field.column.table, {}).setdefault((entity.name, 'NEW', entity.name, None), []).append(entity.name)
-            deps.setdefault(field.column.table, {}).setdefault((entity.name, 'OLD', entity.name, None), []).append(entity.name)
+            deps.setdefault(field.column.table, {}).setdefault((entity.name, 'NEW', backref, None), []).append(backref)
+            deps.setdefault(field.column.table, {}).setdefault((entity.name, 'OLD', backref, None), []).append(backref)
 
             # Inserted or deleted new child row
-            ins_del_deps.setdefault(field.column.table, set()).add((entity.name, entity.name))
+            ins_del_deps.setdefault(field.column.table, set()).add((entity.name, backref))
 
     for table, kinds in sorted(ins_del_deps.items()):
         sections = []
@@ -254,24 +263,24 @@ def iter_main(db, kind, ids=()):
         names.append(field.name)
 
     query = generate_iter_query(columns, joins, ids)
-    with closing(db.cursor('cursor_' + kind)) as cursor:
-        cursor.itersize = 100 * 1000
-        cursor.execute(query, ids)
-        for row in cursor:
-            id = row[0]
-            fields = [E.field(kind, name='kind')]
-            for name, value in zip(names, row[1:]):
-                if not value:
-                    continue
-                if isinstance(value, str):
-                    value = value.decode('utf8')
-                elif not isinstance(value, unicode):
-                    value = unicode(value)
-                try:
-                    fields.append(E.field(value, name=name))
-                except ValueError:
-                    continue # XXX
-            yield id, fields
+    cursor = db.cursor('cursor_' + kind)
+    cursor.itersize = 100 * 1000
+    cursor.execute(query, ids)
+    for row in cursor:
+        id = row[0]
+        fields = [E.field(kind, name='kind'), E.field('%s:%s' % (kind, id), name='id')]
+        for name, value in zip(names, row[1:]):
+            if not value:
+                continue
+            if isinstance(value, str):
+                value = value.decode('utf8')
+            elif not isinstance(value, unicode):
+                value = unicode(value)
+            try:
+                fields.append(E.field(value, name=name))
+            except ValueError:
+                continue # XXX
+        yield id, fields
 
 
 def iter_sub(db, kind, subtable, ids=()):
@@ -290,7 +299,7 @@ def iter_sub(db, kind, subtable, ids=()):
                 if table not in tables:
                     joins.append(table)
                     tables.add(table)
-                    columns.append('%s.%s' % (table, kind))
+                    columns.append('%s.%s' % (table, column.backref or kind))
             else:
                 foreign_table = table + '__' + last_column.name + '__' + column.table
                 if foreign_table not in tables:
@@ -307,31 +316,31 @@ def iter_sub(db, kind, subtable, ids=()):
         names.append(field.name)
 
     query = generate_iter_query(columns, joins, ids)
-    with closing(db.cursor('cursor_' + kind + '_' + subtable)) as cursor:
-        cursor.itersize = 100 * 1000
-        cursor.execute(query, ids)
-        fields = []
-        last_id = None
-        for row in cursor:
-            id = row[0]
-            if last_id != id:
-                if fields:
-                    yield last_id, fields
-                last_id = id
-                fields = []
-            for name, value in zip(names, row[1:]):
-                if not value:
-                    continue
-                if isinstance(value, str):
-                    value = value.decode('utf8')
-                elif not isinstance(value, unicode):
-                    value = unicode(value)
-                try:
-                    fields.append(E.field(value, name=name))
-                except ValueError:
-                    continue # XXX
-        if fields:
-            yield last_id, fields
+    cursor = db.cursor('cursor_' + kind + '_' + subtable)
+    cursor.itersize = 100 * 1000
+    cursor.execute(query, ids)
+    fields = []
+    last_id = None
+    for row in cursor:
+        id = row[0]
+        if last_id != id:
+            if fields:
+                yield last_id, fields
+            last_id = id
+            fields = []
+        for name, value in zip(names, row[1:]):
+            if not value:
+                continue
+            if isinstance(value, str):
+                value = value.decode('utf8')
+            elif not isinstance(value, unicode):
+                value = unicode(value)
+            try:
+                fields.append(E.field(value, name=name))
+            except ValueError:
+                continue # XXX
+    if fields:
+        yield last_id, fields
 
 
 def placeholders(ids):
@@ -353,7 +362,7 @@ def merge(main, *extra):
                 if extra_item[0] == id:
                     fields.extend(extra_item[1])
                     current[i] = grab_next(extra[i])
-        yield E.doc(*fields)
+        yield id, E.doc(*fields)
 
 
 def fetch_entities(db, kind, ids=()):
@@ -398,6 +407,26 @@ def fetch_all(cfg, db):
         fetch_release_groups(db) if cfg.solr.index_release_groups else [],
         fetch_artists(db) if cfg.solr.index_artists else [],
         fetch_labels(db) if cfg.solr.index_labels else [])
+
+
+def fetch_all_updated(cfg, db):
+    queue = cfg.schema.name("mbslave") + ".mbslave_solr_queue"
+    updated = {}
+    cursor = db.cursor()
+    cursor.execute("SELECT id, entity_type, entity_id FROM " + queue)
+    for id, kind, entity_id in cursor:
+        if kind not in updated:
+            updated[kind] = set()
+        db.cursor().execute("DELETE FROM " + queue + " WHERE id = %s", (id,))
+        updated[kind].add(entity_id)
+    for kind, ids in updated.iteritems():
+        if getattr(cfg.solr, 'index_%ss' % kind):
+            missing = set(ids)
+            for id, doc in fetch_entities(db, kind, list(ids)):
+                missing.remove(id)
+                yield E.add(doc)
+            if missing:
+                yield E.delete(*map(E.id, ['%s:%s' % (kind, id) for id in missing]))
 
 
 class SolrReplicationHook(ReplicationHook):

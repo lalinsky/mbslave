@@ -11,7 +11,7 @@ cfg = Config(os.path.join(os.path.dirname(__file__), 'mbslave.conf'))
 db = connect_db(cfg, True)
 
 print '<add>'
-for doc in fetch_all(cfg, db):
+for id, doc in fetch_all(cfg, db):
     print ET.tostring(doc)
 print '</add>'
 
