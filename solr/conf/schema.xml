@@ -27,7 +27,7 @@
 			- artist
 			- label
 			- release
-			- releasegroup
+			- release_group
 			- recording
 			- work
 		-->
@@ -40,7 +40,7 @@
 		<field name="name" type="text" indexed="true" />
 
 		<!-- Artist sort name, label sort name. -->
-		<field name="sortname" type="text" indexed="true" />
+		<field name="sort_name" type="text" indexed="true" />
 
 		<!-- Artist sort name, label sort name. -->
 		<field name="disambiguation" type="text" indexed="true" />

@@ -198,13 +198,23 @@ echo "UPDATE replication_control SET current_schema_sequence = 16;" | ./mbslave-
 If you would like to also build a Solr index for searching, mbslave includes a script to
 export the MusicBrainz into XML file that you can feed to Solr:
 
-    ./mbslave-solr-export.py >/tmp/solr-data.xml
+    ./mbslave-solr-export.py >/tmp/mbslave-solr-data.xml
 
 Once you have generated this file, you for example start a local instance of Solr:
 
     java -Dsolr.solr.home=/path/to/mbslave/solr/ -jar start.jar
 
-And tell it to import the XML file:
+Import the XML file:
 
-    curl http://localhost:8983/solr/musicbrainz/update -F stream.file=/tmp/solr-data.xml -F commit=true
+    curl http://localhost:8983/solr/musicbrainz/update -F stream.file=/tmp/mbslave-solr-data.xml -F commit=true
+
+Install triggers to queue database updates:
+
+    echo 'CREATE SCHEMA mbslave;' | ./mbslave-psql.py -S
+    ./mbslave-remap-schema.py <sql-extra/solr-queue.sql | ./mbslave-psql.py -s mbslave
+    ./mbslave-solr-generate-triggers.py | ./mbslave-remap-schema.py | ./mbslave-psql.py -s mbslave
+
+Update the index:
+
+    ./mbslave-solr-update.py
 

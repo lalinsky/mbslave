@@ -66,7 +66,7 @@ schema = Schema([
         Field('name', Column('name', ForeignColumn('artist_name', 'name'))),
         Field('sort_name', Column('sort_name', ForeignColumn('artist_name', 'name'))),
         Field('country', Column('country', ForeignColumn('country', 'name', null=True))),
-        Field('country_code', Column('country', ForeignColumn('country', 'iso_code', null=True))),
+        Field('country', Column('country', ForeignColumn('country', 'iso_code', null=True))),
         Field('gender', Column('gender', ForeignColumn('gender', 'name', null=True))),
         Field('type', Column('type', ForeignColumn('artist_type', 'name', null=True))),
         MultiField('mbid', ForeignColumn('artist_gid_redirect', 'gid', backref='new_id')),
@@ -80,7 +80,7 @@ schema = Schema([
         Field('name', Column('name', ForeignColumn('label_name', 'name'))),
         Field('sort_name', Column('sort_name', ForeignColumn('label_name', 'name'))),
         Field('country', Column('country', ForeignColumn('country', 'name', null=True))),
-        Field('country_code', Column('country', ForeignColumn('country', 'iso_code', null=True))),
+        Field('country', Column('country', ForeignColumn('country', 'iso_code', null=True))),
         Field('type', Column('type', ForeignColumn('label_type', 'name', null=True))),
         MultiField('mbid', ForeignColumn('label_gid_redirect', 'gid', backref='new_id')),
         MultiField('ipi', ForeignColumn('label_ipi', 'ipi')),
@@ -115,6 +115,8 @@ schema = Schema([
         Field('status', Column('status', ForeignColumn('release_status', 'name', null=True))),
         Field('type', Column('release_group', ForeignColumn('release_group', 'type', ForeignColumn('release_group_primary_type', 'name', null=True)))),
         Field('artist', Column('artist_credit', ForeignColumn('artist_credit', 'name', ForeignColumn('artist_name', 'name')))),
+        Field('country', Column('country', ForeignColumn('country', 'name', null=True))),
+        Field('country', Column('country', ForeignColumn('country', 'iso_code', null=True))),
         MultiField('mbid', ForeignColumn('release_gid_redirect', 'gid', backref='new_id')),
         MultiField('catno', ForeignColumn('release_label', 'catalog_number')),
         MultiField('label', ForeignColumn('release_label', 'label', ForeignColumn('label', 'name', ForeignColumn('label_name', 'name')))),
@@ -401,12 +403,12 @@ def fetch_works(db, ids=()):
 
 def fetch_all(cfg, db):
     return itertools.chain(
-        fetch_works(db) if cfg.solr.index_works else [],
-        fetch_recordings(db) if cfg.solr.index_recordings else [],
-        fetch_releases(db) if cfg.solr.index_releases else [],
-        fetch_release_groups(db) if cfg.solr.index_release_groups else [],
         fetch_artists(db) if cfg.solr.index_artists else [],
-        fetch_labels(db) if cfg.solr.index_labels else [])
+        fetch_labels(db) if cfg.solr.index_labels else [],
+        fetch_recordings(db) if cfg.solr.index_recordings else [],
+        fetch_release_groups(db) if cfg.solr.index_release_groups else [],
+        fetch_releases(db) if cfg.solr.index_releases else [],
+        fetch_works(db) if cfg.solr.index_works else [])
 
 
 def fetch_all_updated(cfg, db):
