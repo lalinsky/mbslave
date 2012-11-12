@@ -17,12 +17,16 @@ for doc in fetch_all_updated(cfg, db):
     xml.write('\n')
 xml.write('</update>\n')
 
-req = urllib2.Request(cfg.solr.url + '/update', xml.getvalue(),
+req = urllib2.Request(cfg.solr.url + '/update?commit=true', xml.getvalue(),
     {'Content-Type': 'application/xml; encoding=UTF-8'})
 resp = urllib2.urlopen(req)
 the_page = resp.read()
 
-print the_page
+doc = ET.fromstring(the_page)
+status = doc.find("lst[@name='responseHeader']/int[@name='status']")
+if status.text != '0':
+    print the_page
+    raise SystemExit(1)
 
 db.commit()
 
