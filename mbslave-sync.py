@@ -162,11 +162,7 @@ db = connect_db(config)
 base_url = config.get('MUSICBRAINZ', 'base_url')
 ignored_tables = set(config.get('TABLES', 'ignore').split(','))
 
-if config.solr.enabled:
-    from mbslave.search import SolrReplicationHook
-    hook_class = SolrReplicationHook
-else:
-    hook_class = ReplicationHook
+hook_class = ReplicationHook
 
 cursor = db.cursor()
 cursor.execute("SELECT current_schema_sequence, current_replication_sequence FROM %s.replication_control" % config.schema.name('musicbrainz'))
