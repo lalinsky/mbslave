@@ -18,15 +18,13 @@ statistics=statistics
 cover_art_archive=cover_art_archive
 
 [solr]
-enabled=no
 url=http://localhost:8983/solr/musicbrainz/
-update_queue=./solr/queue
-index_artists=yes
-index_labels=yes
-index_releases=yes
-index_release_groups=yes
-index_recordings=yes
-index_works=yes
+index_artists=no
+index_labels=no
+index_releases=no
+index_release_groups=no
+index_recordings=no
+index_works=no
 
 [monitoring]
 enabled=no
