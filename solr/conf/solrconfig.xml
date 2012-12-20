@@ -1,22 +1,21 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <config>
 
-	<luceneMatchVersion>LUCENE_35</luceneMatchVersion>
+	<luceneMatchVersion>LUCENE_40</luceneMatchVersion>
+
+	<dataDir>${solr.data.dir:}</dataDir>
 	<directoryFactory name="DirectoryFactory" class="${solr.directoryFactory:solr.StandardDirectoryFactory}"/>
+
 	<updateHandler class="solr.DirectUpdateHandler2" />
 
-	<requestDispatcher handleSelect="true" >
+	<requestDispatcher handleSelect="false" >
 		<requestParsers enableRemoteStreaming="true" multipartUploadLimitInKB="2048" />
 	</requestDispatcher>
 
-	<requestHandler name="standard" class="solr.StandardRequestHandler" default="true" />
-	<requestHandler name="/update" class="solr.XmlUpdateRequestHandler" />
-	<requestHandler name="/admin/" class="org.apache.solr.handler.admin.AdminHandlers" />
-      
-	<!-- config for the admin interface --> 
-	<admin>
-		<defaultQuery>solr</defaultQuery>
-	</admin>
+	<requestHandler name="/select" class="solr.SearchHandler" />
+	<requestHandler name="/update" class="solr.UpdateRequestHandler" />
+
+	<requestHandler name="/admin/" class="solr.admin.AdminHandlers" />
 
 </config>
 

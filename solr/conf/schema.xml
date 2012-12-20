@@ -19,25 +19,28 @@
 
 	<fields>   
 
+		<!-- Internal ID: "<kind>:<rowid>" -->
+		<field name="id" type="string" indexed="true" stored="true" required="true" />
+
 		<!--
 		Type of the entity this document stores. Can be one of:
 			- artist
 			- label
 			- release
-			- releasegroup
+			- release_group
 			- recording
 			- work
 		-->
 		<field name="kind" type="string" indexed="true" stored="true" required="true" />
 
-		<!-- For most entity types, it's just the MBID. It must uniquely identify the document. -->
-		<field name="id" type="string" indexed="true" stored="true" required="true" />
+		<!-- MusicBrainz unique ID. This field includes also merged MBIDs -->
+		<field name="mbid" type="string" indexed="true" stored="true" required="true" multiValued="true" />
 
 		<!-- Artist name, label name, release group title, recording or recording title. -->
 		<field name="name" type="text" indexed="true" />
 
 		<!-- Artist sort name, label sort name. -->
-		<field name="sortname" type="text" indexed="true" />
+		<field name="sort_name" type="text" indexed="true" />
 
 		<!-- Artist sort name, label sort name. -->
 		<field name="disambiguation" type="text" indexed="true" />
@@ -49,7 +52,7 @@
 		<field name="artist" type="text" indexed="true" multiValued="true" />
 
 		<!-- Artist type, label type, work type. -->
-		<field name="type" type="text" indexed="true" />
+		<field name="type" type="text" indexed="true" multiValued="true" />
 
 		<!-- Release status. -->
 		<field name="status" type="text" indexed="true" />

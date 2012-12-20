@@ -5,13 +5,16 @@ import itertools
 from lxml import etree as ET
 from lxml.builder import E
 from mbslave import Config, connect_db
-from mbslave.search import fetch_all
+from mbslave.search import generate_triggers
 
 cfg = Config(os.path.join(os.path.dirname(__file__), 'mbslave.conf'))
-db = connect_db(cfg, True)
+db = connect_db(cfg)
 
-print '<add>'
-for id, doc in fetch_all(cfg, db):
-    print ET.tostring(doc)
-print '</add>'
+print '\set ON_ERROR_STOP 1'
+print 'BEGIN;'
+
+for code in generate_triggers():
+    print code
+
+print 'COMMIT;'
 
