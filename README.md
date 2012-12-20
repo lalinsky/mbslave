@@ -14,12 +14,10 @@ user to user.
     mbslave.conf.default. If you are starting completely from scratch,
     you can use the following commands to setup a clean database:
 
-    ```sh
-sudo su - postgres
-createuser musicbrainz
-createdb -l C -E UTF-8 -T template0 -O musicbrainz musicbrainz
-createlang plpgsql musicbrainz
-```
+        sudo su - postgres
+        createuser musicbrainz
+        createdb -l C -E UTF-8 -T template0 -O musicbrainz musicbrainz
+        createlang plpgsql musicbrainz
 
  2. Prepare empty schemas for the MusicBrainz database and create the table structure:
 
