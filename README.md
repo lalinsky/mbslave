@@ -21,47 +21,35 @@ user to user.
 
  2. Prepare empty schemas for the MusicBrainz database and create the table structure:
 
-    ```sh
-    echo 'CREATE SCHEMA musicbrainz;' | ./mbslave-psql.py -S
-    echo 'CREATE SCHEMA statistics;' | ./mbslave-psql.py -S
-    echo 'CREATE SCHEMA cover_art_archive;' | ./mbslave-psql.py -S
-    ./mbslave-remap-schema.py <sql/CreateTables.sql | sed 's/CUBE/TEXT/' | ./mbslave-psql.py
-    ./mbslave-remap-schema.py <sql/statistics/CreateTables.sql | ./mbslave-psql.py
-    ./mbslave-remap-schema.py <sql/caa/CreateTables.sql | ./mbslave-psql.py
-    ```
+        echo 'CREATE SCHEMA musicbrainz;' | ./mbslave-psql.py -S
+        echo 'CREATE SCHEMA statistics;' | ./mbslave-psql.py -S
+        echo 'CREATE SCHEMA cover_art_archive;' | ./mbslave-psql.py -S
+        ./mbslave-remap-schema.py <sql/CreateTables.sql | sed 's/CUBE/TEXT/' | ./mbslave-psql.py
+        ./mbslave-remap-schema.py <sql/statistics/CreateTables.sql | ./mbslave-psql.py
+        ./mbslave-remap-schema.py <sql/caa/CreateTables.sql | ./mbslave-psql.py
 
  3. Download the MusicBrainz database dump files from
     http://ftp.musicbrainz.org/pub/musicbrainz/data/fullexport/
 
  4. Import the data dumps, for example:
 
-    ```sh
-    ./mbslave-import.py mbdump.tar.bz2 mbdump-derived.tar.bz2
-    ```
+        ./mbslave-import.py mbdump.tar.bz2 mbdump-derived.tar.bz2
 
  5. Setup primary keys, indexes and views:
 
-    ```sh
-    ./mbslave-remap-schema.py <sql/CreatePrimaryKeys.sql | ./mbslave-psql.py
-    ./mbslave-remap-schema.py <sql/statistics/CreatePrimaryKeys.sql | ./mbslave-psql.py
-    ./mbslave-remap-schema.py <sql/caa/CreatePrimaryKeys.sql | ./mbslave-psql.py
-	```
+        ./mbslave-remap-schema.py <sql/CreatePrimaryKeys.sql | ./mbslave-psql.py
+        ./mbslave-remap-schema.py <sql/statistics/CreatePrimaryKeys.sql | ./mbslave-psql.py
+        ./mbslave-remap-schema.py <sql/caa/CreatePrimaryKeys.sql | ./mbslave-psql.py
 
-    ```sh
-    ./mbslave-remap-schema.py <sql/CreateIndexes.sql | grep -vE '(collate|page_index|tracklist_index)' | ./mbslave-psql.py
-    ./mbslave-remap-schema.py <sql/statistics/CreateIndexes.sql | ./mbslave-psql.py
-    ./mbslave-remap-schema.py <sql/caa/CreateIndexes.sql | ./mbslave-psql.py
-	```
+        ./mbslave-remap-schema.py <sql/CreateIndexes.sql | grep -vE '(collate|page_index|tracklist_index)' | ./mbslave-psql.py
+        ./mbslave-remap-schema.py <sql/statistics/CreateIndexes.sql | ./mbslave-psql.py
+        ./mbslave-remap-schema.py <sql/caa/CreateIndexes.sql | ./mbslave-psql.py
 
-    ```sh
-    ./mbslave-remap-schema.py <sql/CreateSimpleViews.sql | ./mbslave-psql.py
-    ```
+        ./mbslave-remap-schema.py <sql/CreateSimpleViews.sql | ./mbslave-psql.py
 
  6. Vacuum the newly created database (optional)
 
-    ```sh
-    echo 'VACUUM ANALYZE;' | ./mbslave-psql.py
-    ```
+        echo 'VACUUM ANALYZE;' | ./mbslave-psql.py
 
 ## Replication
 
