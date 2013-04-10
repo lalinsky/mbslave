@@ -79,6 +79,8 @@ class PacketImporter(object):
             #print ' - Running transaction', xid
             #print 'BEGIN; --', xid
             for id, schema, table, type in sorted(transaction):
+                if not self._config.schema.get(schema, None):
+                    continue
                 if table in self._ignored_tables:
                     continue
                 fulltable = fqn(schema, table)
