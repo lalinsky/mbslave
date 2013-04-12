@@ -41,14 +41,17 @@ class MonitoringConfig(object):
             self.status_file = parser.get(section, 'status_file')
 
 
-class SchemasConfig(dict):
+class SchemasConfig(object):
+
+    def __init__(self):
+        self.mapping = {}
 
     def name(self, name):
-        return self.get(name, name)
+        return self.mapping.get(name, name)
 
     def parse(self, parser, section):
         for name, value in parser.items(section):
-            self[name] = value
+            self.mapping[name] = value
 
 
 class Config(object):
