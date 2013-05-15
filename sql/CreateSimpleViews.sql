@@ -69,7 +69,7 @@ CREATE OR REPLACE VIEW s_track AS
 
 CREATE OR REPLACE VIEW s_work AS
     SELECT
-        w.id, gid, n.name, artist_credit,
+        w.id, gid, n.name,
         type, comment, edits_pending, last_updated
     FROM work w
     JOIN work_name n ON w.name=n.id;
