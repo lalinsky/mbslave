@@ -7,8 +7,9 @@ CREATE OR REPLACE VIEW s_artist AS
         a.id, gid, n.name, sn.name AS sort_name,
         begin_date_year, begin_date_month, begin_date_day,
         end_date_year, end_date_month, end_date_day,
-        type, country, gender, comment,
-        edits_pending, last_updated, ended
+        type, area, gender, comment,
+        edits_pending, last_updated, ended,
+        begin_area, end_area
     FROM artist a
     JOIN artist_name n ON a.name=n.id
     JOIN artist_name sn ON a.sort_name=sn.id;
@@ -31,7 +32,7 @@ CREATE OR REPLACE VIEW s_label AS
         a.id, a.gid, n.name, sn.name AS sort_name,
         a.begin_date_year, a.begin_date_month, a.begin_date_day,
         a.end_date_year, a.end_date_month, a.end_date_day,
-        a.label_code, a.type, a.country, a.comment,
+        a.label_code, a.area, a.country, a.comment,
         a.edits_pending, a.last_updated, ended
     FROM label a
     JOIN label_name n ON a.name = n.id
