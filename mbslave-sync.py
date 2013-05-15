@@ -79,7 +79,7 @@ class PacketImporter(object):
             #print ' - Running transaction', xid
             #print 'BEGIN; --', xid
             for id, schema, table, type in sorted(transaction):
-                if not self._config.schema.mapping.get(schema):
+                if schema == '<ignore>':
                     continue
                 if table in self._ignored_tables:
                     continue
