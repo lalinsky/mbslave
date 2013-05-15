@@ -199,6 +199,15 @@ Alternatively, if you want to map them both to for example `musicbrainz` which a
 ./mbslave-remap-schema.py <sql/updates/20130313-relationship-documentation.sql | grep -v 'CREATE SCHEMA' | ./mbslave-psql.py
 
 ```
+
+Because this documentation uses a slightly non-standard setup, we need to prepare the database for upgrade:
+
+```sh
+grep 'VIEW' sql/CreateSimpleViews.sql | sed 's/CREATE OR REPLACE/DROP/' | sed 's/ AS/;/' | ./mbslave-psql.py
+tail -n+61 sql/CreateFunctions.sql | head -n 64 | ./mbslave-remap-schema.py | ./mbslave-psql.py
+
+Now run the actual upgrade:
+
 ```sh
 ./mbslave-remap-schema.py <sql/updates/20130414-work-attributes.sql | ./mbslave-psql.py
 ./mbslave-remap-schema.py <sql/updates/20130117-cover-image-types.sql | ./mbslave-psql.py
@@ -207,11 +216,18 @@ Alternatively, if you want to map them both to for example `musicbrainz` which a
 ./mbslave-remap-schema.py <sql/updates/20130222-drop-work.artist_credit.sql | ./mbslave-psql.py
 ./mbslave-remap-schema.py <sql/updates/20130322-multiple-country-dates.sql | ./mbslave-psql.py
 ./mbslave-remap-schema.py <sql/updates/20130225-rename-link_type.short_link_phrase.sql | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20130301-areas.sql | grep -v to_tsvector | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20130425-edit-area.sql
-./mbslave-remap-schema.py <sql/SetSequences.sql
-./mbslave-remap-schema.py <sql/updates/20130318-track-mbid-reduplicate-tracklists.sql | grep -v 'USING GIST'
-./mbslave-remap-schema.py <sql/updates/20120914-isni.sql
+./mbslave-remap-schema.py <sql/SetSequences.sql | ./mbslave-psql.py # ignore errors
+./mbslave-remap-schema.py <sql/updates/20130301-areas.sql | grep -vE '(to_tsvector|page_index)' | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130425-edit-area.sql | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130318-track-mbid-reduplicate-tracklists.sql | grep -v 'USING GIST' | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20120914-isni.sql | ./mbslave-psql.py
+```
+
+Re-create the simple views and increase the schema number:
+
+```sh
+./mbslave-psql.py <sql/CreateSimpleViews.sql
+echo "UPDATE replication_control SET current_schema_sequence = 17;" | ./mbslave-psql.py
 ```
 
 ## Solr Search Index (Work-In-Progress)
