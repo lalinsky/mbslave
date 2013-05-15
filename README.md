@@ -106,6 +106,7 @@ Because this documentation uses a slightly non-standard setup, we need to prepar
 ```sh
 grep 'VIEW' sql/CreateSimpleViews.sql | sed 's/CREATE OR REPLACE/DROP/' | sed 's/ AS/;/' | ./mbslave-psql.py
 tail -n+61 sql/CreateFunctions.sql | head -n 64 | ./mbslave-remap-schema.py | ./mbslave-psql.py
+```
 
 Now run the actual upgrade:
 
