@@ -219,7 +219,7 @@ Now run the actual upgrade:
 ./mbslave-remap-schema.py <sql/SetSequences.sql | ./mbslave-psql.py # ignore errors
 ./mbslave-remap-schema.py <sql/updates/20130301-areas.sql | grep -vE '(to_tsvector|page_index)' | ./mbslave-psql.py
 ./mbslave-remap-schema.py <sql/updates/20130425-edit-area.sql | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20130318-track-mbid-reduplicate-tracklists.sql | grep -v 'USING GIST' | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130318-track-mbid-reduplicate-tracklists.sql | grep -vE '(USING GIST|controlled_for_whitespace)' | ./mbslave-psql.py
 ./mbslave-remap-schema.py <sql/updates/20120914-isni.sql | ./mbslave-psql.py
 ```
 
