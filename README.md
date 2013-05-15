@@ -24,9 +24,13 @@ user to user.
         echo 'CREATE SCHEMA musicbrainz;' | ./mbslave-psql.py -S
         echo 'CREATE SCHEMA statistics;' | ./mbslave-psql.py -S
         echo 'CREATE SCHEMA cover_art_archive;' | ./mbslave-psql.py -S
+        echo 'CREATE SCHEMA wikidocs;' | ./mbslave-psql.py -S
+        echo 'CREATE SCHEMA documentation;' | ./mbslave-psql.py -S
         ./mbslave-remap-schema.py <sql/CreateTables.sql | sed 's/CUBE/TEXT/' | ./mbslave-psql.py
         ./mbslave-remap-schema.py <sql/statistics/CreateTables.sql | ./mbslave-psql.py
         ./mbslave-remap-schema.py <sql/caa/CreateTables.sql | ./mbslave-psql.py
+        ./mbslave-remap-schema.py <sql/wikidocs/CreateTables.sql | ./mbslave-psql.py
+        ./mbslave-remap-schema.py <sql/documentation/CreateTables.sql | ./mbslave-psql.py
 
  3. Download the MusicBrainz database dump files from
     http://ftp.musicbrainz.org/pub/musicbrainz/data/fullexport/
@@ -40,10 +44,14 @@ user to user.
         ./mbslave-remap-schema.py <sql/CreatePrimaryKeys.sql | ./mbslave-psql.py
         ./mbslave-remap-schema.py <sql/statistics/CreatePrimaryKeys.sql | ./mbslave-psql.py
         ./mbslave-remap-schema.py <sql/caa/CreatePrimaryKeys.sql | ./mbslave-psql.py
+        ./mbslave-remap-schema.py <sql/wikidocs/CreatePrimaryKeys.sql | ./mbslave-psql.py
+        ./mbslave-remap-schema.py <sql/documentation/CreatePrimaryKeys.sql | ./mbslave-psql.py
 
         ./mbslave-remap-schema.py <sql/CreateIndexes.sql | grep -vE '(collate|page_index|tracklist_index)' | ./mbslave-psql.py
         ./mbslave-remap-schema.py <sql/statistics/CreateIndexes.sql | ./mbslave-psql.py
         ./mbslave-remap-schema.py <sql/caa/CreateIndexes.sql | ./mbslave-psql.py
+        ./mbslave-remap-schema.py <sql/wikidocs/CreateIndexes.sql | ./mbslave-psql.py
+        ./mbslave-remap-schema.py <sql/documentation/CreateIndexes.sql | ./mbslave-psql.py
 
         ./mbslave-remap-schema.py <sql/CreateSimpleViews.sql | ./mbslave-psql.py
 
