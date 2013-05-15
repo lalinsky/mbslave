@@ -179,6 +179,41 @@ grep 'VIEW' sql/CreateSimpleViews.sql | sed 's/CREATE OR REPLACE/DROP/' | sed 's
 echo "UPDATE replication_control SET current_schema_sequence = 16;" | ./mbslave-psql.py
 ```
 
+### Release 2013-05-15
+
+There are again two new schemas, so before you begin you need to update your
+`mbslave.conf` to define the mapping for the new schemas. See
+`mbslave.conf.default` for the default configuration.
+
+Assuming the schemas are not renamed, or they are renamed to names that do not yet exist in the database, so you can run the following:
+
+```sh
+./mbslave-remap-schema.py <sql/updates/20130222-transclusion-table.sql | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130313-relationship-documentation.sql | ./mbslave-psql.py
+```
+
+Alternatively, if you want to map them both to for example `musicbrainz` which already exists, use this:
+
+```sh
+./mbslave-remap-schema.py <sql/updates/20130222-transclusion-table.sql | grep -v 'CREATE SCHEMA' | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130313-relationship-documentation.sql | grep -v 'CREATE SCHEMA' | ./mbslave-psql.py
+
+```
+```sh
+./mbslave-remap-schema.py <sql/updates/20130414-work-attributes.sql | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130117-cover-image-types.sql | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130312-collection-descriptions.sql | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130313-instrument-credits.sql | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130222-drop-work.artist_credit.sql | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130322-multiple-country-dates.sql | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130225-rename-link_type.short_link_phrase.sql | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130301-areas.sql | grep -v to_tsvector | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130425-edit-area.sql
+./mbslave-remap-schema.py <sql/SetSequences.sql
+./mbslave-remap-schema.py <sql/updates/20130318-track-mbid-reduplicate-tracklists.sql | grep -v 'USING GIST'
+./mbslave-remap-schema.py <sql/updates/20120914-isni.sql
+```
+
 ## Solr Search Index (Work-In-Progress)
 
 If you would like to also build a Solr index for searching, mbslave includes a script to

@@ -1,3 +1,5 @@
+\set ON_ERROR_STOP 1
+
 BEGIN;
 
 SET search_path = 'cover_art_archive';
@@ -22,6 +24,6 @@ SELECT cover_art.*,
         JOIN cover_art_archive.art_type ON cover_art_type.type_id = art_type.id
         WHERE cover_art_type.id = cover_art.id) AS types
 FROM cover_art_archive.cover_art
-JOIN musicbrainz.edit ON edit.id = cover_art.edit;
+LEFT JOIN musicbrainz.edit ON edit.id = cover_art.edit;
 
 COMMIT;
