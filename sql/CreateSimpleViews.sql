@@ -32,7 +32,7 @@ CREATE OR REPLACE VIEW s_label AS
         a.id, a.gid, n.name, sn.name AS sort_name,
         a.begin_date_year, a.begin_date_month, a.begin_date_day,
         a.end_date_year, a.end_date_month, a.end_date_day,
-        a.label_code, a.area, a.country, a.comment,
+        a.label_code, a.area, a.comment,
         a.edits_pending, a.last_updated, ended
     FROM label a
     JOIN label_name n ON a.name = n.id
