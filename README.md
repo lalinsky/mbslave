@@ -53,7 +53,7 @@ user to user.
         ./mbslave-remap-schema.py <sql/wikidocs/CreateIndexes.sql | ./mbslave-psql.py
         ./mbslave-remap-schema.py <sql/documentation/CreateIndexes.sql | ./mbslave-psql.py
 
-        ./mbslave-remap-schema.py <sql/CreateSimpleViews.sql | ./mbslave-psql.py
+        ./mbslave-remap-schema.py <sql-extra/CreateSimpleViews.sql | ./mbslave-psql.py
 
  6. Vacuum the newly created database (optional)
 
@@ -104,7 +104,7 @@ Alternatively, if you want to map them both to for example `musicbrainz` which a
 Because this documentation uses a slightly non-standard setup, we need to prepare the database for upgrade:
 
 ```sh
-grep 'VIEW' sql/CreateSimpleViews.sql | sed 's/CREATE OR REPLACE/DROP/' | sed 's/ AS/;/' | ./mbslave-psql.py
+grep 'VIEW' sql-extra/CreateSimpleViews.sql | sed 's/CREATE OR REPLACE/DROP/' | sed 's/ AS/;/' | ./mbslave-psql.py
 tail -n+61 sql/CreateFunctions.sql | head -n 64 | ./mbslave-remap-schema.py | ./mbslave-psql.py
 ```
 
@@ -128,7 +128,7 @@ Now run the actual upgrade:
 Re-create the simple views and increase the schema number:
 
 ```sh
-./mbslave-psql.py <sql/CreateSimpleViews.sql
+./mbslave-psql.py <sql-extra/CreateSimpleViews.sql
 echo "UPDATE replication_control SET current_schema_sequence = 17;" | ./mbslave-psql.py
 ```
 
