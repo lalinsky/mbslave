@@ -98,7 +98,6 @@ Alternatively, if you want to map them both to for example `musicbrainz` which a
 ```sh
 ./mbslave-remap-schema.py <sql/updates/20130222-transclusion-table.sql | grep -v 'CREATE SCHEMA' | ./mbslave-psql.py
 ./mbslave-remap-schema.py <sql/updates/20130313-relationship-documentation.sql | grep -v 'CREATE SCHEMA' | ./mbslave-psql.py
-
 ```
 
 Because this documentation uses a slightly non-standard setup, we need to prepare the database for upgrade:
@@ -123,6 +122,12 @@ Now run the actual upgrade:
 ./mbslave-remap-schema.py <sql/updates/20130425-edit-area.sql | ./mbslave-psql.py
 ./mbslave-remap-schema.py <sql/updates/20130318-track-mbid-reduplicate-tracklists.sql | grep -vE '(USING GIST|controlled_for_whitespace)' | ./mbslave-psql.py
 ./mbslave-remap-schema.py <sql/updates/20120914-isni.sql | ./mbslave-psql.py
+```
+
+The migration scripts missed one index, so we need to add it manually:
+
+```sh
+echo "CREATE INDEX medium_idx_release ON medium (release);" | ./mbslave-psql.py
 ```
 
 Re-create the simple views and increase the schema number:
