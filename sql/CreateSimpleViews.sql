@@ -53,6 +53,21 @@ CREATE OR REPLACE VIEW s_release AS
     FROM release r
     JOIN release_name n ON r.name=n.id;
 
+CREATE OR REPLACE VIEW s_release_country AS
+    SELECT
+        release, country, date_year, date_month, date_day
+    FROM release_country
+    UNION ALL
+    SELECT release, NULL AS country, date_year, date_month, date_day
+    FROM release_unknown_country;
+
+CREATE OR REPLACE VIEW s_first_release_country AS
+    SELECT DISTINCT ON (release)
+        release, country, date_year, date_month, date_day
+    FROM s_release_country
+    ORDER BY release, date_year NULLS LAST, date_month NULLS LAST,
+             date_day NULLS LAST, country NULLS LAST;
+
 CREATE OR REPLACE VIEW s_release_group AS
     SELECT
         rg.id, gid, n.name, artist_credit,
