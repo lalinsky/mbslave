@@ -47,11 +47,9 @@ user to user.
         ./mbslave-remap-schema.py <sql/wikidocs/CreatePrimaryKeys.sql | ./mbslave-psql.py
         ./mbslave-remap-schema.py <sql/documentation/CreatePrimaryKeys.sql | ./mbslave-psql.py
 
-        ./mbslave-remap-schema.py <sql/CreateIndexes.sql | grep -vE '(collate|page_index|tracklist_index)' | ./mbslave-psql.py
+        ./mbslave-remap-schema.py <sql/CreateIndexes.sql | grep -vE '(collate|page_index|medium_index)' | ./mbslave-psql.py
         ./mbslave-remap-schema.py <sql/statistics/CreateIndexes.sql | ./mbslave-psql.py
         ./mbslave-remap-schema.py <sql/caa/CreateIndexes.sql | ./mbslave-psql.py
-        ./mbslave-remap-schema.py <sql/wikidocs/CreateIndexes.sql | ./mbslave-psql.py
-        ./mbslave-remap-schema.py <sql/documentation/CreateIndexes.sql | ./mbslave-psql.py
 
         ./mbslave-remap-schema.py <sql-extra/CreateSimpleViews.sql | ./mbslave-psql.py
 
