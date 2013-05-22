@@ -78,7 +78,7 @@ When the MusicBrainz database schema changes, the replication will stop working.
 This is usually announced on the [MusicBrainz blog](http://blog.musicbrainz.org/).
 When it happens, you need to upgrade the database.
 
-### Release 2013-05-15
+### Release 2013-05-15 (17)
 
 There are again two new schemas, so before you begin you need to update your
 `mbslave.conf` to define the mapping for the new schemas. See
@@ -133,6 +133,27 @@ Re-create the simple views and increase the schema number:
 ```sh
 ./mbslave-psql.py <sql-extra/CreateSimpleViews.sql
 echo "UPDATE replication_control SET current_schema_sequence = 17;" | ./mbslave-psql.py
+```
+
+### Release 2013-05-15 (18)
+
+Tentative instructions, based on the review, not the final version of the code:
+
+```sh
+./update-sql.sh
+./mbslave-remap-schema.py <sql/updates/20130520-drop-track-indexes.sql | ./mbslave-psql.py
+echo "DELETE FROM track;" | ./mbslave-psql.py
+wget http://ftp.musicbrainz.org/pub/musicbrainz/data/schema-change-2013-05-15/mbdump.tar.bz2 mbdump-track.tar.bz2
+./mbslave-import.py mbdump-track.tar.bz2
+./mbslave-remap-schema.py <sql/updates/20130520-create-track-indexes.sql | ./mbslave-psql.py
+echo "ALTER TABLE medium_cdtoc DROP CONSTRAINT IF EXISTS medium_cdtoc_fk_medium;" | ./admin/psql
+./mbslave-remap-schema.py <sql/SetSequences | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130520-update-artist-credit-refcount-faster.sql | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130520-medium-release-index.sql | ./mbslave-psql.py
+echo "ALTER INDEX medium2013_pkey RENAME TO medium_pkey;" | ./mbslave-psql.py
+echo "ALTER INDEX track2013_pkey RENAME TO track_pkey;" | ./mbslave-psql.py 
+./mbslave-remap-schema.py <sql/updates/20130520-rename-indexes-constraints.sql | ./mbslave-psql.py
+echo "UPDATE replication_control SET current_schema_sequence = 18;" | ./mbslave-psql.py
 ```
 
 ## Solr Search Index (Work-In-Progress)
