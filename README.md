@@ -142,17 +142,19 @@ Tentative instructions, based on the review, not the final version of the code:
 ```sh
 ./update-sql.sh
 ./mbslave-remap-schema.py <sql/updates/20130520-drop-track-indexes.sql | ./mbslave-psql.py
-echo "DELETE FROM track;" | ./mbslave-psql.py
-wget http://ftp.musicbrainz.org/pub/musicbrainz/data/schema-change-2013-05-15/mbdump.tar.bz2 mbdump-track.tar.bz2
+echo "TRUNCATE track;" | ./mbslave-psql.py
+wget http://ftp.musicbrainz.org/pub/musicbrainz/data/schema-change-2013-05-15/mbdump.tar.bz2 -O mbdump-track.tar.bz2
 ./mbslave-import.py mbdump-track.tar.bz2
 ./mbslave-remap-schema.py <sql/updates/20130520-create-track-indexes.sql | ./mbslave-psql.py
-echo "ALTER TABLE medium_cdtoc DROP CONSTRAINT IF EXISTS medium_cdtoc_fk_medium;" | ./admin/psql
-./mbslave-remap-schema.py <sql/SetSequences | ./mbslave-psql.py
+echo "ALTER TABLE medium_cdtoc DROP CONSTRAINT IF EXISTS medium_cdtoc_fk_medium;" | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/SetSequences.sql | ./mbslave-psql.py
+grep 'VIEW' sql-extra/CreateSimpleViews.sql | sed 's/CREATE OR REPLACE/DROP/' | sed 's/ AS/;/' | ./mbslave-psql.py
 ./mbslave-remap-schema.py <sql/updates/20130520-update-artist-credit-refcount-faster.sql | ./mbslave-psql.py
 ./mbslave-remap-schema.py <sql/updates/20130520-medium-release-index.sql | ./mbslave-psql.py
 echo "ALTER INDEX medium2013_pkey RENAME TO medium_pkey;" | ./mbslave-psql.py
 echo "ALTER INDEX track2013_pkey RENAME TO track_pkey;" | ./mbslave-psql.py 
 ./mbslave-remap-schema.py <sql/updates/20130520-rename-indexes-constraints.sql | ./mbslave-psql.py
+./mbslave-psql.py <sql-extra/CreateSimpleViews.sql
 echo "UPDATE replication_control SET current_schema_sequence = 18;" | ./mbslave-psql.py
 ```
 
