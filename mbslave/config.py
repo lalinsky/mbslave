@@ -78,10 +78,10 @@ class Config(object):
         opts['database'] = self.cfg.get('DATABASE', 'name')
         opts['user'] = self.cfg.get('DATABASE', 'user')
         if self.cfg.has_option('DATABASE', 'password'):
-	        opts['password'] = self.cfg.get('DATABASE', 'password')
+            opts['password'] = self.cfg.get('DATABASE', 'password')
         if self.cfg.has_option('DATABASE', 'host'):
-	        opts['host'] = self.cfg.get('DATABASE', 'host')
+            opts['host'] = self.cfg.get('DATABASE', 'host')
         if self.cfg.has_option('DATABASE', 'port'):
-	        opts['port'] = self.cfg.get('DATABASE', 'port')
+            opts['port'] = self.cfg.get('DATABASE', 'port')
         return opts
 
