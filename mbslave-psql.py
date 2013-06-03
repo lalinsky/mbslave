@@ -2,7 +2,7 @@
 
 import os
 from optparse import OptionParser
-from mbslave import Config, connect_db
+from mbslave import Config
 
 parser = OptionParser()
 parser.add_option("-S", "--no-schema", action="store_true", dest="public", default=False, help="don't configure the default schema")
