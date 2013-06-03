@@ -9,9 +9,6 @@ class ReplicationHook(object):
     def begin(self, seq):
         pass
 
-    def after_commit(self):
-        pass
-
     def before_commit(self):
         pass
 
