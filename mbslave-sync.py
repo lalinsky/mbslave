@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
-import psycopg2
 import tarfile
-import sys
 import os
 import re
 import urllib2

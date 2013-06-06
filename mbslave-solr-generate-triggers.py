@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 
 import os
-import itertools
-from lxml import etree as ET
-from lxml.builder import E
 from mbslave import Config, connect_db
 from mbslave.search import generate_triggers
 

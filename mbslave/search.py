@@ -1,9 +1,5 @@
 import itertools
-import urllib2
-import psycopg2.extras
-from contextlib import closing
 from collections import namedtuple
-from lxml import etree as ET
 from lxml.builder import E
 
 Entity = namedtuple('Entity', ['name', 'fields'])
