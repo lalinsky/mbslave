@@ -110,7 +110,7 @@ CREATE TABLE artist (
     edits_pending       INTEGER NOT NULL DEFAULT 0 CHECK (edits_pending >= 0),
     last_updated        TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     ended               BOOLEAN NOT NULL DEFAULT FALSE
-      CHECK (
+      CONSTRAINT artist_ended_check CHECK (
         (
           -- If any end date fields are not null, then ended must be true
           (end_date_year IS NOT NULL OR
@@ -126,6 +126,14 @@ CREATE TABLE artist (
       ),
     begin_area          INTEGER, -- references area.id
     end_area            INTEGER -- references area.id
+);
+
+CREATE TABLE artist_deletion
+(
+    gid UUID NOT NULL, -- PK
+    last_known_name INTEGER NOT NULL, -- references artist_name.id
+    last_known_comment TEXT NOT NULL,
+    deleted_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE artist_alias_type (
@@ -391,7 +399,6 @@ CREATE TABLE editor
 (
     id                  SERIAL,
     name                VARCHAR(64) NOT NULL,
-    password            VARCHAR(64) NOT NULL,
     privs               INTEGER DEFAULT 0,
     email               VARCHAR(64) DEFAULT NULL,
     website             VARCHAR(255) DEFAULT NULL,
@@ -406,7 +413,9 @@ CREATE TABLE editor
     last_updated        TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     birth_date          DATE,
     gender              INTEGER, -- references gender.id
-    area                INTEGER -- references area.id
+    area                INTEGER, -- references area.id
+    password            VARCHAR(128) NOT NULL,
+    ha1                 CHAR(32) NOT NULL
 );
 
 CREATE TYPE FLUENCY AS ENUM ('basic', 'intermediate', 'advanced', 'native');
@@ -429,10 +438,15 @@ CREATE TABLE editor_subscribe_artist
 (
     id                  SERIAL,
     editor              INTEGER NOT NULL, -- references editor.id
-    artist              INTEGER NOT NULL, -- weakly references artist
-    last_edit_sent      INTEGER NOT NULL, -- weakly references edit
-    deleted_by_edit     INTEGER NOT NULL DEFAULT 0, -- weakly references edit
-    merged_by_edit      INTEGER NOT NULL DEFAULT 0 -- weakly references edit
+    artist              INTEGER NOT NULL, -- references artist.id
+    last_edit_sent      INTEGER NOT NULL -- references edit.id
+);
+
+CREATE TABLE editor_subscribe_artist_deleted
+(
+    editor INTEGER NOT NULL, -- PK, references editor.id
+    gid UUID NOT NULL, -- PK, references artist_deletion.gid
+    deleted_by INTEGER NOT NULL -- references edit.id
 );
 
 CREATE TABLE editor_subscribe_collection
@@ -449,10 +463,15 @@ CREATE TABLE editor_subscribe_label
 (
     id                  SERIAL,
     editor              INTEGER NOT NULL, -- references editor.id
-    label               INTEGER NOT NULL, -- weakly references label
-    last_edit_sent      INTEGER NOT NULL, -- weakly references edit
-    deleted_by_edit     INTEGER NOT NULL DEFAULT 0, -- weakly references edit
-    merged_by_edit      INTEGER NOT NULL DEFAULT 0 -- weakly references edit
+    label               INTEGER NOT NULL, -- references label.id
+    last_edit_sent      INTEGER NOT NULL -- references edit.id
+);
+
+CREATE TABLE editor_subscribe_label_deleted
+(
+    editor INTEGER NOT NULL, -- PK, references editor.id
+    gid UUID NOT NULL, -- PK, references label_deletion.gid
+    deleted_by INTEGER NOT NULL -- references edit.id
 );
 
 CREATE TABLE editor_subscribe_editor
@@ -878,7 +897,7 @@ CREATE TABLE label (
     edits_pending       INTEGER NOT NULL DEFAULT 0 CHECK (edits_pending >= 0),
     last_updated        TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     ended               BOOLEAN NOT NULL DEFAULT FALSE
-      CHECK (
+      CONSTRAINT label_ended_check CHECK (
         (
           -- If any end date fields are not null, then ended must be true
           (end_date_year IS NOT NULL OR
@@ -894,6 +913,13 @@ CREATE TABLE label (
       )
 );
 
+CREATE TABLE label_deletion
+(
+    gid UUID NOT NULL, -- PK
+    last_known_name INTEGER NOT NULL, -- references label_name.id
+    last_known_comment TEXT NOT NULL,
+    deleted_at timestamptz NOT NULL DEFAULT now()
+);
 
 CREATE TABLE label_rating_raw
 (
@@ -1025,7 +1051,7 @@ CREATE TABLE link
     attribute_count     INTEGER NOT NULL DEFAULT 0,
     created             TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     ended               BOOLEAN NOT NULL DEFAULT FALSE
-      CHECK (
+      CONSTRAINT link_ended_check CHECK (
         (
           -- If any end date fields are not null, then ended must be true
           (end_date_year IS NOT NULL OR

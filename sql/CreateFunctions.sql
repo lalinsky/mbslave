@@ -246,6 +246,8 @@ BEGIN
         -- release group is changed, decrement release_count in the original RG, increment in the new one
         UPDATE release_group_meta SET release_count = release_count - 1 WHERE id = OLD.release_group;
         UPDATE release_group_meta SET release_count = release_count + 1 WHERE id = NEW.release_group;
+        PERFORM set_release_group_first_release_date(OLD.release_group);
+        PERFORM set_release_group_first_release_date(NEW.release_group);
     END IF;
     RETURN NULL;
 END;
@@ -342,12 +344,12 @@ $$ LANGUAGE 'plpgsql';
 CREATE OR REPLACE FUNCTION ensure_work_attribute_type_allows_text()
 RETURNS trigger AS $$
   BEGIN
-    IF NEW.work_attribute_text IS NOT NULL 
+    IF NEW.work_attribute_text IS NOT NULL
         AND NOT EXISTS (
-           SELECT TRUE FROM work_attribute_type 
-		WHERE work_attribute_type.id = NEW.work_attribute_type 
+           SELECT TRUE FROM work_attribute_type
+		WHERE work_attribute_type.id = NEW.work_attribute_type
 		AND free_text
-	) 
+	)
     THEN
         RAISE EXCEPTION 'This attribute type can not contain free text';
     ELSE RETURN NEW;
@@ -861,21 +863,9 @@ END
 $BODY$
 LANGUAGE 'plpgsql' ;
 
-CREATE OR REPLACE FUNCTION deny_special_purpose_artist_deletion() RETURNS trigger AS $$
+CREATE OR REPLACE FUNCTION deny_special_purpose_deletion() RETURNS trigger AS $$
 BEGIN
-    IF OLD.id IN (1, 2) THEN
-        RAISE EXCEPTION 'Attempted to delete a special purpose row';
-    END IF;
-    RETURN OLD;
-END;
-$$ LANGUAGE 'plpgsql';
-
-CREATE OR REPLACE FUNCTION deny_special_purpose_label_deletion() RETURNS trigger AS $$
-BEGIN
-    IF OLD.id = 1 THEN
-        RAISE EXCEPTION 'Attempted to delete a special purpose row';
-    END IF;
-    RETURN OLD;
+    RAISE EXCEPTION 'Attempted to delete a special purpose row';
 END;
 $$ LANGUAGE 'plpgsql';
 
@@ -1097,6 +1087,17 @@ BEGIN
 END;
 $$ LANGUAGE 'plpgsql';
 
+CREATE OR REPLACE FUNCTION end_area_implies_ended()
+RETURNS trigger AS $$
+BEGIN
+    IF NEW.end_area IS NOT NULL
+    THEN
+        NEW.ended = TRUE;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
+
 CREATE OR REPLACE FUNCTION delete_orphaned_recordings()
 RETURNS TRIGGER
 AS $$
@@ -1182,6 +1183,21 @@ RETURNS trigger AS $$
     PERFORM delete_unused_tag(OLD.tag);
     RETURN NULL;
   END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION inserting_edits_requires_confirmed_email_address()
+RETURNS trigger AS $$
+BEGIN
+  IF NOT (
+    SELECT email_confirm_date IS NOT NULL AND email_confirm_date <= now()
+    FROM editor
+    WHERE editor.id = NEW.editor
+  ) THEN
+    RAISE EXCEPTION 'Editor tried to create edit without a confirmed email address';
+  ELSE
+    RETURN NEW;
+  END IF;
+END;
 $$ LANGUAGE 'plpgsql';
 
 COMMIT;
