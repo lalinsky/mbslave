@@ -98,7 +98,7 @@ grep 'VIEW' sql-extra/CreateSimpleViews.sql | sed 's/CREATE OR REPLACE/DROP/' | 
 ./mbslave-remap-schema.py <sql/updates/20130618-places.sql | grep -vE '(collate|page_index|medium_index|to_tsvector)' | ./mbslave-psql.py
 ./mbslave-remap-schema.py <sql/SetSequences.sql | ./mbslave-psql.py
 ./mbslave-remap-schema.py <sql/updates/20130903-editor-deletion.sql | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20130704-ended.sql | grep -vE '(CREATE TRIGGER|FOR EACH ROW)' | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130704-ended.sql | ./mbslave-psql.py
 ./mbslave-remap-schema.py <sql/updates/20130919-area-comments.sql | ./mbslave-psql.py
 ./mbslave-remap-schema.py <sql/updates/20130905-deprecated-link-types.sql | ./mbslave-psql.py
 ./mbslave-remap-schema.py <sql/CreateViews.sql | ./mbslave-psql.py
