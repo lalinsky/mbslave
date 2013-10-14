@@ -24,7 +24,7 @@ args.append(config.get('DATABASE', 'name'))
 
 if not options.public:
     schema = config.schema.name(options.schema)
-    os.environ['PGOPTIONS'] = '-c search_path=%s' % schema
+    os.environ['PGOPTIONS'] = '-c search_path=%s,public' % schema
 if config.has_option('DATABASE', 'password'):
     os.environ['PGPASSWORD'] = config.get('DATABASE', 'password')
 os.execvp("psql", args)
