@@ -51,7 +51,7 @@ user to user.
         ./mbslave-remap-schema.py <sql/statistics/CreateIndexes.sql | ./mbslave-psql.py
         ./mbslave-remap-schema.py <sql/caa/CreateIndexes.sql | ./mbslave-psql.py
 
-        ./mbslave-remap-schema.py <sql-extra/CreateSimpleViews.sql | ./mbslave-psql.py
+        ./mbslave-remap-schema.py <sql/CreateViews.sql | ./mbslave-psql.py
 
  6. Vacuum the newly created database (optional)
 
@@ -78,84 +78,32 @@ When the MusicBrainz database schema changes, the replication will stop working.
 This is usually announced on the [MusicBrainz blog](http://blog.musicbrainz.org/).
 When it happens, you need to upgrade the database.
 
-### Release 2013-05-15 (17)
+### Release 2013-10-14 (19)
 
-There are again two new schemas, so before you begin you need to update your
-`mbslave.conf` to define the mapping for the new schemas. See
-`mbslave.conf.default` for the default configuration.
-
-Assuming the schemas are not renamed, or they are renamed to names that do not yet exist in the database, so you can run the following:
+This release removes PUID-related tables. If you want to keep the tables, even thought they are
+no longer updated, you can skip the next command. If you want to keep only the currently supported tables,
+drop them with the following command:
 
 ```sh
-./mbslave-remap-schema.py <sql/updates/20130222-transclusion-table.sql | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20130313-relationship-documentation.sql | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130807-drop-table-puid.sql | ./mbslave-psql.py
 ```
 
-Alternatively, if you want to map them both to for example `musicbrainz` which already exists, use this:
-
-```sh
-./mbslave-remap-schema.py <sql/updates/20130222-transclusion-table.sql | grep -v 'CREATE SCHEMA' | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20130313-relationship-documentation.sql | grep -v 'CREATE SCHEMA' | ./mbslave-psql.py
-```
-
-Because this documentation uses a slightly non-standard setup, we need to prepare the database for upgrade:
+The rest of the migration process should apply to all databases. If you have created your database with a
+custom settings, not following this file, you might want to skip the filters on the SQL files to not
+create certain indexes.
 
 ```sh
 grep 'VIEW' sql-extra/CreateSimpleViews.sql | sed 's/CREATE OR REPLACE/DROP/' | sed 's/ AS/;/' | ./mbslave-psql.py
-tail -n+61 sql/CreateFunctions.sql | head -n 64 | ./mbslave-remap-schema.py | ./mbslave-psql.py
-```
-
-Now run the actual upgrade:
-
-```sh
-./mbslave-remap-schema.py <sql/updates/20130414-work-attributes.sql | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20130117-cover-image-types.sql | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20130312-collection-descriptions.sql | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20130313-instrument-credits.sql | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20130222-drop-work.artist_credit.sql | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20130322-multiple-country-dates.sql | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20130225-rename-link_type.short_link_phrase.sql | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/SetSequences.sql | ./mbslave-psql.py # ignore errors
-./mbslave-remap-schema.py <sql/updates/20130301-areas.sql | grep -vE '(to_tsvector|page_index)' | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20130425-edit-area.sql | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20130318-track-mbid-reduplicate-tracklists.sql | grep -vE '(USING GIST|controlled_for_whitespace)' | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20120914-isni.sql | ./mbslave-psql.py
-```
-
-The migration scripts missed one index, so we need to add it manually:
-
-```sh
-echo "CREATE INDEX medium_idx_release ON medium (release);" | ./mbslave-psql.py
-```
-
-Re-create the simple views and increase the schema number:
-
-```sh
-./mbslave-psql.py <sql-extra/CreateSimpleViews.sql
-echo "UPDATE replication_control SET current_schema_sequence = 17;" | ./mbslave-psql.py
-```
-
-### Release 2013-05-15 (18)
-
-Tentative instructions, based on the review, not the final version of the code:
-
-```sh
-./update-sql.sh
-./mbslave-remap-schema.py <sql/updates/20130520-drop-track-indexes.sql | ./mbslave-psql.py
-echo "TRUNCATE track;" | ./mbslave-psql.py
-wget http://ftp.musicbrainz.org/pub/musicbrainz/data/schema-change-2013-05-15/mbdump.tar.bz2 -O mbdump-track.tar.bz2
-./mbslave-import.py mbdump-track.tar.bz2
-./mbslave-remap-schema.py <sql/updates/20130520-create-track-indexes.sql | ./mbslave-psql.py
-echo "ALTER TABLE medium_cdtoc DROP CONSTRAINT IF EXISTS medium_cdtoc_fk_medium;" | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130819-name-tables.sql | grep -vE '(collate|page_index|medium_index|to_tsvector)' | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130618-places.sql | grep -vE '(collate|page_index|medium_index|to_tsvector)' | ./mbslave-psql.py
 ./mbslave-remap-schema.py <sql/SetSequences.sql | ./mbslave-psql.py
-grep 'VIEW' sql-extra/CreateSimpleViews.sql | sed 's/CREATE OR REPLACE/DROP/' | sed 's/ AS/;/' | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20130520-update-artist-credit-refcount-faster.sql | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20130520-medium-release-index.sql | ./mbslave-psql.py
-echo "ALTER INDEX medium2013_pkey RENAME TO medium_pkey;" | ./mbslave-psql.py
-echo "ALTER INDEX track2013_pkey RENAME TO track_pkey;" | ./mbslave-psql.py 
-./mbslave-remap-schema.py <sql/updates/20130520-rename-indexes-constraints.sql | ./mbslave-psql.py
-./mbslave-psql.py <sql-extra/CreateSimpleViews.sql
-echo "UPDATE replication_control SET current_schema_sequence = 18;" | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130903-editor-deletion.sql | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130704-ended.sql | grep -vE '(CREATE TRIGGER|FOR EACH ROW)' | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130919-area-comments.sql | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20130905-deprecated-link-types.sql | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/CreateViews.sql | ./mbslave-psql.py
+echo 'UPDATE replication_control SET current_schema_sequence = 19;' | ./mbslave-psql.py
+echo 'VACUUM ANALYZE;' | ./mbslave-psql.py
 ```
 
 ## Solr Search Index (Work-In-Progress)
