@@ -1,0 +1,11 @@
+DROP VIEW s_work;
+DROP VIEW s_track;
+DROP VIEW s_release_group;
+DROP VIEW s_first_release_country;
+DROP VIEW s_release_country;
+DROP VIEW s_release;
+DROP VIEW s_recording;
+DROP VIEW s_label;
+DROP VIEW s_artist_credit_name;
+DROP VIEW s_artist_credit;
+DROP VIEW s_artist;

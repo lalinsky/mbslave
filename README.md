@@ -93,7 +93,7 @@ custom settings, not following this file, you might want to skip the filters on 
 create certain indexes.
 
 ```sh
-grep 'VIEW' sql-extra/CreateSimpleViews.sql | sed 's/CREATE OR REPLACE/DROP/' | sed 's/ AS/;/' | ./mbslave-psql.py
+./mbslave-psql.py <sql-extra/DropSimpleViews.sql
 ./mbslave-remap-schema.py <sql/updates/20130819-name-tables.sql | grep -vE '(collate|page_index|medium_index|to_tsvector)' | ./mbslave-psql.py
 ./mbslave-remap-schema.py <sql/updates/20130618-places.sql | grep -vE '(collate|page_index|medium_index|to_tsvector)' | ./mbslave-psql.py
 ./mbslave-remap-schema.py <sql/SetSequences.sql | ./mbslave-psql.py
