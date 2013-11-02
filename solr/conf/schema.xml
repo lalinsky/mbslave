@@ -63,6 +63,9 @@
 		<!-- IPI code. Applicable for: artist, label. -->
 		<field name="ipi" type="text" indexed="true" multiValued="true" />
 
+		<!-- ISNI code. Applicable for: artist, label. -->
+		<field name="isni" type="text" indexed="true" multiValued="true" />
+
 		<!-- ISWC code. Applicable for: work. -->
 		<field name="iswc" type="text" indexed="true" multiValued="true" />
 
@@ -81,7 +84,10 @@
 		<!-- Barcode. Applicable for: release. -->
 		<field name="barcode" type="text" indexed="true" />
 
-		<!-- Country name or ISO code. Applicable for: artist, label, release. -->
+		<!-- Area name. Applicable for: artist, label, place. -->
+		<field name="area" type="text" indexed="true" stored="false" multiValued="true" />
+
+		<!-- Country name or ISO code. Applicable for: release. -->
 		<field name="country" type="text" indexed="true" stored="false" multiValued="true" />
 
 	</fields>

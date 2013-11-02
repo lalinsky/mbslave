@@ -58,72 +58,81 @@ schema = Schema([
     Entity('artist', [
         Field('mbid', Column('gid')),
         Field('disambiguation', Column('comment')),
-        Field('name', Column('name', ForeignColumn('artist_name', 'name'))),
-        Field('sort_name', Column('sort_name', ForeignColumn('artist_name', 'name'))),
-        Field('country', Column('country', ForeignColumn('country', 'name', null=True))),
-        Field('country', Column('country', ForeignColumn('country', 'iso_code', null=True))),
+        Field('name', Column('name')),
+        Field('sort_name', Column('sort_name')),
+        Field('area', Column('area', ForeignColumn('area', 'name', null=True))),
         Field('gender', Column('gender', ForeignColumn('gender', 'name', null=True))),
         Field('type', Column('type', ForeignColumn('artist_type', 'name', null=True))),
         MultiField('mbid', ForeignColumn('artist_gid_redirect', 'gid', backref='new_id')),
         MultiField('ipi', ForeignColumn('artist_ipi', 'ipi')),
-        MultiField('alias', ForeignColumn('artist_alias', 'name', ForeignColumn('artist_name', 'name'))),
+        MultiField('isni', ForeignColumn('artist_isni', 'isni')),
+        MultiField('alias', ForeignColumn('artist_alias', 'name')),
     ]),
     Entity('label', [
         Field('mbid', Column('gid')),
         Field('disambiguation', Column('comment')),
         Field('code', Column('label_code')),
-        Field('name', Column('name', ForeignColumn('label_name', 'name'))),
-        Field('sort_name', Column('sort_name', ForeignColumn('label_name', 'name'))),
-        Field('country', Column('country', ForeignColumn('country', 'name', null=True))),
-        Field('country', Column('country', ForeignColumn('country', 'iso_code', null=True))),
+        Field('name', Column('name')),
+        Field('sort_name', Column('sort_name')),
+        Field('area', Column('area', ForeignColumn('area', 'name', null=True))),
         Field('type', Column('type', ForeignColumn('label_type', 'name', null=True))),
         MultiField('mbid', ForeignColumn('label_gid_redirect', 'gid', backref='new_id')),
         MultiField('ipi', ForeignColumn('label_ipi', 'ipi')),
-        MultiField('alias', ForeignColumn('label_alias', 'name', ForeignColumn('label_name', 'name'))),
+        MultiField('isni', ForeignColumn('label_isni', 'isni')),
+        MultiField('alias', ForeignColumn('label_alias', 'name')),
     ]),
     Entity('work', [
         Field('mbid', Column('gid')),
         Field('disambiguation', Column('comment')),
-        Field('name', Column('name', ForeignColumn('work_name', 'name'))),
-        Field('type', Column('type', ForeignColumn('work_type', 'name', null=True))),
+        Field('name', Column('name')),
+        Field('type', Column('type')),
         MultiField('mbid', ForeignColumn('work_gid_redirect', 'gid', backref='new_id')),
         MultiField('iswc', ForeignColumn('iswc', 'iswc')),
-        MultiField('alias', ForeignColumn('work_alias', 'name', ForeignColumn('work_name', 'name'))),
+        MultiField('alias', ForeignColumn('work_alias', 'name')),
     ]),
     Entity('release_group', [
         Field('mbid', Column('gid')),
         Field('disambiguation', Column('comment')),
-        Field('name', Column('name', ForeignColumn('release_name', 'name'))),
+        Field('name', Column('name')),
         Field('type', Column('type', ForeignColumn('release_group_primary_type', 'name', null=True))),
         MultiField('mbid', ForeignColumn('release_group_gid_redirect', 'gid', backref='new_id')),
         MultiField('type',
             ForeignColumn('release_group_secondary_type_join', 'secondary_type',
                 ForeignColumn('release_group_secondary_type', 'name'))),
-        Field('artist', Column('artist_credit', ForeignColumn('artist_credit', 'name', ForeignColumn('artist_name', 'name')))),
-        MultiField('alias', ForeignColumn('release', 'name', ForeignColumn('release_name', 'name'))),
+        Field('artist', Column('artist_credit', ForeignColumn('artist_credit', 'name'))),
+        MultiField('alias', ForeignColumn('release', 'name')),
     ]),
     Entity('release', [
         Field('mbid', Column('gid')),
         Field('disambiguation', Column('comment')),
         Field('barcode', Column('barcode')),
-        Field('name', Column('name', ForeignColumn('release_name', 'name'))),
+        Field('name', Column('name')),
         Field('status', Column('status', ForeignColumn('release_status', 'name', null=True))),
         Field('type', Column('release_group', ForeignColumn('release_group', 'type', ForeignColumn('release_group_primary_type', 'name', null=True)))),
-        Field('artist', Column('artist_credit', ForeignColumn('artist_credit', 'name', ForeignColumn('artist_name', 'name')))),
-        Field('country', Column('country', ForeignColumn('country', 'name', null=True))),
-        Field('country', Column('country', ForeignColumn('country', 'iso_code', null=True))),
+        Field('artist', Column('artist_credit', ForeignColumn('artist_credit', 'name'))),
+        MultiField('country', ForeignColumn('release_country', 'country', ForeignColumn('area', 'name', null=True))),
+        MultiField('country', ForeignColumn('release_country', 'country', ForeignColumn('iso_3166_1', 'code', null=True, backref='area'))),
         MultiField('mbid', ForeignColumn('release_gid_redirect', 'gid', backref='new_id')),
         MultiField('catno', ForeignColumn('release_label', 'catalog_number')),
-        MultiField('label', ForeignColumn('release_label', 'label', ForeignColumn('label', 'name', ForeignColumn('label_name', 'name')))),
-        Field('alias', Column('release_group', ForeignColumn('release_group', 'name', ForeignColumn('release_name', 'name')))),
+        MultiField('label', ForeignColumn('release_label', 'label', ForeignColumn('label', 'name'))),
+        Field('alias', Column('release_group', ForeignColumn('release_group', 'name'))),
     ]),
     Entity('recording', [
         Field('mbid', Column('gid')),
         Field('disambiguation', Column('comment')),
-        Field('name', Column('name', ForeignColumn('track_name', 'name'))),
-        Field('artist', Column('artist_credit', ForeignColumn('artist_credit', 'name', ForeignColumn('artist_name', 'name')))),
+        Field('name', Column('name')),
+        Field('artist', Column('artist_credit', ForeignColumn('artist_credit', 'name'))),
         MultiField('mbid', ForeignColumn('recording_gid_redirect', 'gid', backref='new_id')),
-        MultiField('alias', ForeignColumn('track', 'name', ForeignColumn('track_name', 'name'))),
+        MultiField('alias', ForeignColumn('track', 'name')),
+    ]),
+    Entity('place', [
+        Field('mbid', Column('gid')),
+        Field('disambiguation', Column('comment')),
+        Field('name', Column('name')),
+        Field('area', Column('area', ForeignColumn('area', 'name', null=True))),
+        Field('type', Column('type', ForeignColumn('place_type', 'name', null=True))),
+        MultiField('mbid', ForeignColumn('place_gid_redirect', 'gid', backref='new_id')),
+        MultiField('alias', ForeignColumn('place_alias', 'name')),
     ]),
 ])
 
@@ -151,11 +160,11 @@ def distinct_values(columns):
 
 def generate_trigger_update(path):
     condition = None
-    for table, column in path[1:]:
+    for table, column, pk in path[1:]:
         if not condition:
-            condition = 'FROM musicbrainz.%s WHERE %s = NEW.id' % (table, column)
+            condition = 'FROM musicbrainz.%s WHERE %s = NEW.%s' % (table, column, pk)
         else:
-            condition = 'FROM musicbrainz.%s WHERE %s IN (SELECT id %s)' % (table, column, condition)
+            condition = 'FROM musicbrainz.%s WHERE %s IN (SELECT %s %s)' % (table, column, pk, condition)
     return path[0][0], path[0][1], condition
 
 
@@ -165,10 +174,10 @@ def generate_triggers():
     for entity in schema.entities:
         for field in entity.iter_single_fields():
             column = field.column
-            path = [(entity.name, column.name)]
+            path = [(entity.name, column.name, 'id')]
             while column.foreign:
                 column = column.foreign
-                path.insert(0, (column.table, column.name))
+                path.insert(0, (column.table, column.name, 'id'))
             for i in range(0, len(path)):
                 table, column, values = generate_trigger_update(path[i:])
                 deps.setdefault(table, {}).setdefault((entity.name, 'NEW', 'id', values), []).append(column)
@@ -180,7 +189,7 @@ def generate_triggers():
             backref = field.column.backref or entity.name
             path = []
             while column:
-                path.insert(0, (column.table, column.name))
+                path.insert(0, (column.table, column.name, column.foreign.backref if (column.foreign and column.foreign.backref) else 'id'))
                 column = column.foreign
             for i in range(0, len(path)):
                 table, column, values = generate_trigger_update(path[i:])
@@ -301,8 +310,9 @@ def iter_sub(db, kind, subtable, ids=()):
                 foreign_table = table + '__' + last_column.name + '__' + column.table
                 if foreign_table not in tables:
                     join = 'LEFT JOIN' if column.null else 'JOIN'
-                    joins.append('%(join)s %(parent)s AS %(label)s ON %(label)s.id = %(child)s.%(child_column)s' % dict(
-                        join=join, parent=column.table, child=table, child_column=last_column.name, label=foreign_table))
+                    pk = column.backref or 'id'
+                    joins.append('%(join)s %(parent)s AS %(label)s ON %(label)s.%(pk)s = %(child)s.%(child_column)s' % dict(
+                        join=join, parent=column.table, child=table, child_column=last_column.name, label=foreign_table, pk=pk))
                     tables.add(foreign_table)
                 table = foreign_table
             if column.foreign is None:
@@ -380,6 +390,10 @@ def fetch_labels(db, ids=()):
     return fetch_entities(db, 'label', ids)
 
 
+def fetch_places(db, ids=()):
+    return fetch_entities(db, 'place', ids)
+
+
 def fetch_release_groups(db, ids=()):
     return fetch_entities(db, 'release_group', ids)
 
@@ -400,6 +414,7 @@ def fetch_all(cfg, db):
     return itertools.chain(
         fetch_artists(db) if cfg.solr.index_artists else [],
         fetch_labels(db) if cfg.solr.index_labels else [],
+        fetch_places(db) if cfg.solr.index_places else [],
         fetch_recordings(db) if cfg.solr.index_recordings else [],
         fetch_release_groups(db) if cfg.solr.index_release_groups else [],
         fetch_releases(db) if cfg.solr.index_releases else [],

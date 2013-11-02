@@ -23,6 +23,7 @@ documentation=documentation
 url=http://localhost:8983/solr/musicbrainz/
 index_artists=no
 index_labels=no
+index_places=no
 index_releases=no
 index_release_groups=no
 index_recordings=no

@@ -12,6 +12,7 @@ class SolrConfig(object):
         self.url = 'http://localhost:8983/solr/musicbrainz'
         self.index_artists = True
         self.index_labels = True
+        self.index_places = True
         self.index_releases = True
         self.index_release_groups = True
         self.index_recordings = True
@@ -22,7 +23,7 @@ class SolrConfig(object):
             self.enabled = parser.getboolean(section, 'enabled')
         if parser.has_option(section, 'url'):
             self.url = parser.get(section, 'url').rstrip('/')
-        for name in ('artists', 'labels', 'releases', 'release_groups', 'recordings', 'works'):
+        for name in ('artists', 'labels', 'places', 'releases', 'release_groups', 'recordings', 'works'):
             key = 'index_%s' % name
             if parser.has_option(section, key):
                 setattr(self, key, parser.getboolean(section, key))
