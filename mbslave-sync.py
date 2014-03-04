@@ -156,7 +156,7 @@ def download_packet(base_url, replication_seq):
     tmp.seek(0)
     return tmp
 
-config = Config(os.path.dirname(__file__) + '/mbslave.conf')
+config = Config(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mbslave.conf'))
 db = connect_db(config)
 
 base_url = config.get('MUSICBRAINZ', 'base_url')
