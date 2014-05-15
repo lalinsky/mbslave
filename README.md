@@ -78,31 +78,30 @@ When the MusicBrainz database schema changes, the replication will stop working.
 This is usually announced on the [MusicBrainz blog](http://blog.musicbrainz.org/).
 When it happens, you need to upgrade the database.
 
-### Release 2013-10-14 (19)
+### Release 2014-05-14 (20)
 
-This release removes PUID-related tables. If you want to keep the tables, even thought they are
-no longer updated, you can skip the next command. If you want to keep only the currently supported tables,
-drop them with the following command:
+Download some new data to import:
 
 ```sh
-./mbslave-remap-schema.py <sql/updates/20130807-drop-table-puid.sql | ./mbslave-psql.py
+wget http://ftp.musicbrainz.org/pub/musicbrainz/data/schema-change-2014-05/mbdump-derived.tar.bz2
+wget http://ftp.musicbrainz.org/pub/musicbrainz/data/schema-change-2014-05/mbdump-documentation.tar.bz2
 ```
 
-The rest of the migration process should apply to all databases. If you have created your database with a
-custom settings, not following this file, you might want to skip the filters on the SQL files to not
-create certain indexes.
+Import the data dumps:
 
 ```sh
-./mbslave-psql.py <sql-extra/DropSimpleViews.sql
-./mbslave-remap-schema.py <sql/updates/20130819-name-tables.sql | grep -vE '(collate|page_index|medium_index|to_tsvector)' | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20130618-places.sql | grep -vE '(collate|page_index|medium_index|to_tsvector)' | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/SetSequences.sql | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20130903-editor-deletion.sql | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20130704-ended.sql | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20130919-area-comments.sql | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/20130905-deprecated-link-types.sql | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/CreateViews.sql | ./mbslave-psql.py
-echo 'UPDATE replication_control SET current_schema_sequence = 19;' | ./mbslave-psql.py
+echo 'TRUNCATE TABLE release_tag;' | ./mbslave-psql.py
+./mbslave-import.py mbdump-derived.tar.bz2
+./mbslave-import.py mbdump-documentation.tar.bz2 
+```
+
+Run the upgrade scripts:
+
+```sh
+./mbslave-remap-schema.py <sql-extra/CreateUUIDFunctions.sql | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/schema-change/20.slave.sql | grep -v to_tsvector | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/20140509-place-example-pkeys.sql | ./mbslave-psql.py
+echo 'UPDATE replication_control SET current_schema_sequence = 20;' | ./mbslave-psql.py
 echo 'VACUUM ANALYZE;' | ./mbslave-psql.py
 ```
 
