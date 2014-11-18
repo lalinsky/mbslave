@@ -251,11 +251,13 @@ INSERT INTO isrc (isrc, recording) VALUES ('DEE250800230', 2);
 INSERT INTO link_attribute_type (id, root, gid, name)
     VALUES (1, 1, '36990974-4f29-4ea1-b562-3838fa9b8832', 'additional');
 INSERT INTO link_attribute_type (id, root, gid, name)
-    VALUES (2, 2, '108d76bd-95eb-4099-aed6-447e4ec78553', 'instrument');
+    VALUES (14, 14, '108d76bd-95eb-4099-aed6-447e4ec78553', 'instrument');
 INSERT INTO link_attribute_type (id, parent, root, gid, name)
-    VALUES (3, 2, 2, '4f7bb10f-396c-466a-8221-8e93f5e454f9', 'String Instruments');
+    VALUES (3, 14, 14, '4f7bb10f-396c-466a-8221-8e93f5e454f9', 'String Instruments');
 INSERT INTO link_attribute_type (id, parent, root, gid, name)
-    VALUES (4, 3, 2, 'c3273296-91ba-453d-94e4-2fb6e958568e', 'Guitar');
+    VALUES (4, 3, 14, 'c3273296-91ba-453d-94e4-2fb6e958568e', 'Guitar');
+
+INSERT INTO link_creditable_attribute_type (attribute_type) VALUES (3), (4);
 
 INSERT INTO link_type (id, gid, entity_type0, entity_type1, name, link_phrase, reverse_link_phrase, long_link_phrase, description)
     VALUES (1, '7610b0e9-40c1-48b3-b06c-2c1d30d9dc3e', 'artist', 'recording', 'instrument', 'performed {additional} {instrument} on', 'has {additional} {instrument} performed by', 'performer', 'description'),
@@ -264,7 +266,7 @@ INSERT INTO link_type (id, gid, entity_type0, entity_type1, name, link_phrase, r
 INSERT INTO link_type_attribute_type (link_type, attribute_type, min, max)
     VALUES (1, 1, 0, 1);
 INSERT INTO link_type_attribute_type (link_type, attribute_type, min, max)
-    VALUES (1, 2, 1, NULL);
+    VALUES (1, 14, 1, NULL);
 
 INSERT INTO link (id, link_type, attribute_count) VALUES (1, 1, 1);
 INSERT INTO link (id, link_type, attribute_count) VALUES (2, 1, 2);
@@ -329,6 +331,7 @@ ALTER SEQUENCE recording_id_seq RESTART 18;
 ALTER SEQUENCE release_id_seq RESTART 4;
 ALTER SEQUENCE release_group_id_seq RESTART 5;
 ALTER SEQUENCE work_id_seq RESTART 2;
+ALTER SEQUENCE url_id_seq RESTART 2;
 
 ALTER SEQUENCE annotation_id_seq RESTART 8;
 
@@ -336,11 +339,13 @@ ALTER SEQUENCE artist_alias_id_seq RESTART 8;
 ALTER SEQUENCE label_alias_id_seq RESTART 8;
 ALTER SEQUENCE track_id_seq RESTART 20;
 ALTER SEQUENCE medium_id_seq RESTART 7;
+ALTER SEQUENCE release_label_id_seq RESTART 5;
 
 ALTER SEQUENCE tag_id_seq RESTART 100;
 
 ALTER SEQUENCE link_id_seq RESTART 3;
 ALTER SEQUENCE link_type_id_seq RESTART 3;
+ALTER SEQUENCE link_attribute_type_id_seq RESTART 5;
 
 ALTER SEQUENCE l_artist_recording_id_seq RESTART 4;
 
