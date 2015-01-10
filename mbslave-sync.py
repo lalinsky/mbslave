@@ -145,7 +145,7 @@ def download_packet(base_url, replication_seq):
     url = base_url + "/replication-%d.tar.bz2" % replication_seq
     print "Downloading", url
     try:
-        data = urllib2.urlopen(url)
+        data = urllib2.urlopen(url, timeout=60)
     except urllib2.HTTPError, e:
         if e.code == 404:
             return None
