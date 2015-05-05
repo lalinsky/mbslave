@@ -141,8 +141,10 @@ def process_tar(fileobj, db, schema, ignored_tables, expected_schema_seq, replic
     importer.process()
 
 
-def download_packet(base_url, replication_seq):
+def download_packet(base_url, token, replication_seq):
     url = base_url + "/replication-%d.tar.bz2" % replication_seq
+    if token:
+        url += '?token=' + token
     print "Downloading", url
     try:
         data = urllib2.urlopen(url, timeout=60)
@@ -160,6 +162,10 @@ config = Config(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mbslav
 db = connect_db(config)
 
 base_url = config.get('MUSICBRAINZ', 'base_url')
+if config.has_option('MUSICBRAINZ', 'token'):
+    token = config.get('MUSICBRAINZ', 'token')
+else:
+    token = None
 ignored_tables = set(config.get('TABLES', 'ignore').split(','))
 
 hook_class = ReplicationHook
@@ -175,7 +181,7 @@ if config.monitoring.enabled:
 while True:
     replication_seq += 1
     hook = hook_class(config, db, config)
-    tmp = download_packet(base_url, replication_seq)
+    tmp = download_packet(base_url, token, replication_seq)
     if tmp is None:
         print 'Not found, stopping'
         status.end()

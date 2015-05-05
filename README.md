@@ -10,8 +10,10 @@ user to user.
 
  0. Make sure you have [Python](http://python.org/) and [psycopg2](http://initd.org/psycopg/) installed.
 
- 1. Setup a database and create `mbslave.conf` by copying and editing
-    mbslave.conf.default. If you are starting completely from scratch,
+ 1. Create `mbslave.conf` by copying and editing `mbslave.conf.default`.
+    You will need to get the API token on the [MetaBrainz website](https://test.metabrainz.org/).
+
+ 1. Setup the database. If you are starting completely from scratch,
     you can use the following commands to setup a clean database:
 
         sudo su - postgres
