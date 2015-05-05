@@ -142,7 +142,7 @@ def process_tar(fileobj, db, schema, ignored_tables, expected_schema_seq, replic
 
 
 def download_packet(base_url, token, replication_seq):
-    url = base_url + "/replication-%d.tar.bz2" % replication_seq
+    url = base_url.rstrip("/") + "/replication-%d.tar.bz2" % replication_seq
     if token:
         url += '?token=' + token
     print "Downloading", url
