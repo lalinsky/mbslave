@@ -50,6 +50,7 @@ user to user.
         ./mbslave-remap-schema.py <sql/documentation/CreatePrimaryKeys.sql | ./mbslave-psql.py
 
         ./mbslave-remap-schema.py <sql/CreateIndexes.sql | grep -vE '(collate|page_index|medium_index)' | ./mbslave-psql.py
+        ./mbslave-remap-schema.py <sql/CreateSlaveIndexes.sql | ./mbslave-psql.py
         ./mbslave-remap-schema.py <sql/statistics/CreateIndexes.sql | ./mbslave-psql.py
         ./mbslave-remap-schema.py <sql/caa/CreateIndexes.sql | ./mbslave-psql.py
 
@@ -80,28 +81,14 @@ When the MusicBrainz database schema changes, the replication will stop working.
 This is usually announced on the [MusicBrainz blog](http://blog.musicbrainz.org/).
 When it happens, you need to upgrade the database.
 
-### Release 2014-11-17 (21)
-
-Download some new data to import:
-
-```sh
-wget ftp://ftp.musicbrainz.org/pub/musicbrainz/data/schema-change-2014-11/mbdump-cdstubs.tar.bz2
-```
-
-Import the data dumps:
-
-```sh
-echo 'TRUNCATE TABLE cdtoc_raw;' | ./mbslave-psql.py
-echo 'TRUNCATE TABLE release_raw;' | ./mbslave-psql.py
-echo 'TRUNCATE TABLE track_raw;' | ./mbslave-psql.py
-./mbslave-import.py mbdump-cdstubs.tar.bz2
-```
+### Release 2015-05-18 (22)
 
 Run the upgrade scripts:
 
 ```sh
-./mbslave-remap-schema.py <sql/updates/schema-change/21.slave.sql | ./mbslave-psql.py
-echo 'UPDATE replication_control SET current_schema_sequence = 21;' | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/schema-change/22.slave_only.sql | ./mbslave-psql.py
+./mbslave-remap-schema.py <sql/updates/schema-change/22.slave.sql | grep -v to_tsvector | ./mbslave-psql.py
+echo 'UPDATE replication_control SET current_schema_sequence = 22;' | ./mbslave-psql.py
 echo 'VACUUM ANALYZE;' | ./mbslave-psql.py
 ```
 
