@@ -81,39 +81,6 @@ When the MusicBrainz database schema changes, the replication will stop working.
 This is usually announced on the [MusicBrainz blog](http://blog.musicbrainz.org/).
 When it happens, you need to upgrade the database.
 
-### Release 2015-05-18 (22)
+### Release 2016-05-24 (23)
 
-Run the upgrade scripts:
-
-```sh
-./mbslave-remap-schema.py <sql/updates/schema-change/22.slave_only.sql | ./mbslave-psql.py
-./mbslave-remap-schema.py <sql/updates/schema-change/22.slave.sql | grep -v to_tsvector | ./mbslave-psql.py
-echo 'UPDATE replication_control SET current_schema_sequence = 22;' | ./mbslave-psql.py
-echo 'VACUUM ANALYZE;' | ./mbslave-psql.py
-```
-
-## Solr Search Index (Work-In-Progress)
-
-If you would like to also build a Solr index for searching, mbslave includes a script to
-export the MusicBrainz into XML file that you can feed to Solr:
-
-    ./mbslave-solr-export.py >/tmp/mbslave-solr-data.xml
-
-Once you have generated this file, you for example start a local instance of Solr:
-
-    java -Dsolr.solr.home=/path/to/mbslave/solr/ -jar start.jar
-
-Import the XML file:
-
-    curl http://localhost:8983/solr/musicbrainz/update -F stream.file=/tmp/mbslave-solr-data.xml -F commit=true
-
-Install triggers to queue database updates:
-
-    echo 'CREATE SCHEMA mbslave;' | ./mbslave-psql.py -S
-    ./mbslave-remap-schema.py <sql-extra/solr-queue.sql | ./mbslave-psql.py -s mbslave
-    ./mbslave-solr-generate-triggers.py | ./mbslave-remap-schema.py | ./mbslave-psql.py -s mbslave
-
-Update the index:
-
-    ./mbslave-solr-update.py
-
+You need to do a full import for this version.

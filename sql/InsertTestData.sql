@@ -1,23 +1,19 @@
 SET client_min_messages TO 'WARNING';
 
-INSERT INTO artist_type (id, name) VALUES (1, 'Person');
-INSERT INTO artist_type (id, name) VALUES (2, 'Group');
-INSERT INTO artist_type (id, name) VALUES (3, 'Special MusicBrainz Artist');
-
-INSERT INTO area_type (id, name) VALUES (1, 'Country');
 INSERT INTO area (id, gid, name, type) VALUES
   (221, '8a754a16-0027-3a29-b6d7-2b40ea0481ed', 'United Kingdom', 1),
   (222, '489ce91b-6658-3307-9877-795b68554c98', 'United States', 1);
 INSERT INTO country_area (area) VALUES (221), (222);
 INSERT INTO iso_3166_1 (area, code) VALUES (221, 'GB'), (222, 'US');
 
-INSERT INTO gender (id, name) VALUES (1, 'Male');
-INSERT INTO gender (id, name) VALUES (2, 'Female');
-
 -- MusicBrainz System Entities
 INSERT INTO artist (id, gid, name, sort_name, type) VALUES
     (1, '89ad4ac3-39f7-470e-963a-56509c546377', 'Various Artists', 'Various Artists', 3),
     (2, 'c06aa285-520e-40c0-b776-83d2c9e8a6d1', 'Deleted Artist', 'Deleted Artist', 3);
+
+INSERT INTO artist (area, begin_area, begin_date_day, begin_date_month, begin_date_year, comment, edits_pending, end_area, end_date_day, end_date_month, end_date_year, ended, gender, gid, id, last_updated, name, sort_name, type) VALUES
+    (222, NULL, NULL, NULL, 1983, '', 0, NULL, NULL, NULL, NULL, '0', 1, 'fa263cb3-205f-4a7f-91e1-94e3df52abe8', 196418, '2011-08-18 11:37:18.247651-05', 'Jimmy Edgar', 'Edgar, Jimmy', 1),
+    (221, NULL, NULL, NULL, NULL, 'UK electronic artist', 0, NULL, NULL, NULL, NULL, '0', 1, 'e4787c4e-0b1a-48bd-b9a0-b0427391d293', 514734, '2014-06-06 12:43:54.273108-05', 'patten', 'patten', 1);
 
 -- Test Artist
 INSERT INTO artist
@@ -65,35 +61,42 @@ INSERT INTO release_group (id, gid, name, artist_credit, type) VALUES
 INSERT INTO release_group (id, gid, name, artist_credit, type) VALUES
     (4, '7348f3a0-454e-11de-8a39-0800200c9a66', 'Test RG 2', 4, 1);
 
-INSERT INTO work_type (id, name) VALUES (1, 'Composition');
-INSERT INTO work_type (id, name) VALUES (2, 'Symphony');
+INSERT INTO release_group_alias (id, name, sort_name, release_group, edits_pending)
+    VALUES (1, 'Test RG 1 Alias 1', 'Test RG 1 Alias Sort Name 1', 3, 0),
+           (2, 'Test RG 1 Alias 2', 'Test RG 1 Alias Sort Name 2', 3, 0);
+
 INSERT INTO work (id, gid, name, type) VALUES
     (1, '745c079d-374e-4436-9448-da92dedef3ce', 'Dancing Queen', 1);
 INSERT INTO iswc (work, iswc) VALUES (1, 'T-000.000.001-0');
 
-INSERT INTO release_packaging (id, name) VALUES (1, 'Jewel Case');
-INSERT INTO release_packaging (id, name) VALUES (2, 'Digipak');
-
-INSERT INTO language (id, iso_code_2t, iso_code_2b, iso_code_1, iso_code_3, name, frequency)
-    VALUES (1, 'deu', 'ger', 'de', 'deu', 'German', 2),
-           (2, 'lit', 'lit', 'lt', 'lit', 'Lithuanian', 1);
+INSERT INTO release_packaging (id, name, gid) VALUES (1, 'Jewel Case', 'e2ac3831-739d-11de-8a39-0800200c9a66');
+INSERT INTO release_packaging (id, name, gid) VALUES (2, 'Digipak', 'e1ab3831-739d-11de-8a39-0800200c9a66');
 
 INSERT INTO script (id, iso_code, iso_number, name, frequency)
     VALUES (1, 'Ugar', '040', 'Ugaritic', 2),
            (2, 'Hebr', '125', 'Hebrew', 4);
 
-INSERT INTO label_type (id, name) VALUES (1, 'Production');
-INSERT INTO label_type (id, name) VALUES (2, 'Special MusicBrainz Label');
-
 -- Special Labels
 INSERT INTO label (id, gid, name, type) VALUES
-    (1, 'f43e252d-9ebf-4e8e-bba8-36d080756cc1', 'Deleted Label', 2);
+    (1, 'f43e252d-9ebf-4e8e-bba8-36d080756cc1', 'Deleted Label', 4);
 
 INSERT INTO label (id, gid, name, type, area, label_code,
                    begin_date_year, begin_date_month, begin_date_day,
                    end_date_year, end_date_month, end_date_day, comment)
-     VALUES (2, '46f0f4cd-8aab-4b33-b698-f459faf64190', 'Warp Records', 1, 221, 2070,
+     VALUES (2, '46f0f4cd-8aab-4b33-b698-f459faf64190', 'Warp Records', 4, 221, 2070,
              1989, 02, 03, 2008, 05, 19, 'Sheffield based electronica label');
+
+-- recording contract relationships for Warp Records
+INSERT INTO link (attribute_count, begin_date_day, begin_date_month, begin_date_year, created, end_date_day, end_date_month, end_date_year, ended, id, link_type) VALUES
+    (0, NULL, NULL, NULL, '2014-01-12 18:00:27.843631-06', NULL, NULL, 2008, '1', 146318, 121),
+    (0, 5, 11, 2013, '2013-12-08 14:19:44.210478-06', NULL, NULL, NULL, '0', 141690, 121);
+
+INSERT INTO l_artist_label (edits_pending, entity0, entity0_credit, entity1, entity1_credit, id, last_updated, link, link_order) VALUES
+    (0, 196418, '', 2, '', 458, '2014-01-12 18:00:27.843631-06', 146318, 0),
+    (0, 514734, '', 2, '', 6340, '2013-12-15 15:00:13.130313-06', 141690, 0);
+
+INSERT INTO label_alias (id, name, sort_name, label, edits_pending, type)
+    VALUES (1, 'Test Label Alias', 'Test Label Alias', 2, 2, 1);
 
 INSERT INTO label (id, gid, name) VALUES
     (3, '4b4ccf60-658e-11de-8a39-0800200c9a66', 'Another Label');
@@ -103,7 +106,6 @@ INSERT INTO label (id, gid, name) VALUES
 
 INSERT INTO release (id, gid, name, artist_credit, release_group, status, packaging, barcode) VALUES (1, 'f34c079d-374e-4436-9448-da92dedef3ce', 'Arrival', 2, 1, 1, 1, '731453398122');
 INSERT INTO release_country (release, country, date_year, date_month, date_day) VALUES (1, 221, 2009, 5, 8);
-;
 
 INSERT INTO release_label (id, release, label, catalog_number)
     VALUES (1, 1, 2, 'ABC-123');
@@ -112,9 +114,6 @@ INSERT INTO release_label (id, release, label, catalog_number)
 
 INSERT INTO url (id, gid, url)
     VALUES (1, '9201840b-d810-4e0f-bb75-c791205f5b24', 'http://musicbrainz.org/');
-
-INSERT INTO medium_format (id, name) VALUES (1, 'CD');
-INSERT INTO medium_format (id, name) VALUES (2, 'Vinyl');
 
 INSERT INTO medium (id, release, position, format, name) VALUES (1, 1, 1, 1, 'The First Disc');
 INSERT INTO medium (id, release, position, format, name) VALUES (2, 1, 2, 1, 'The Second Disc');
@@ -129,7 +128,7 @@ INSERT INTO track (id, gid, recording, medium, position, number, name, artist_cr
     VALUES (3, '06ebb97d-bdf8-42c8-96c2-cd0f3eb39de6', 1, 2, 1, 1, 'Track 3', 2);
 
 -- A full editor
-INSERT INTO editor (id, name, password, privs, email, website, bio, email_confirm_date, member_since, last_login_date, edits_accepted, edits_rejected, auto_edits_accepted, edits_failed, ha1) VALUES (1, 'new_editor', '{CLEARTEXT}password', 0, 'test@editor.org', 'http://musicbrainz.org', 'biography', '2005-10-20', '1989-07-23', now(), 12, 2, 59, 9, 'e1dd8fee8ee728b0ddc8027d3a3db478');
+INSERT INTO editor (id, name, password, privs, email, website, bio, email_confirm_date, member_since, last_login_date, ha1) VALUES (1, 'new_editor', '{CLEARTEXT}password', 0, 'test@editor.org', 'http://musicbrainz.org', 'biography', '2005-10-20', '1989-07-23', now(), 'e1dd8fee8ee728b0ddc8027d3a3db478');
 
 INSERT INTO editor_preference (editor, name, value) VALUES (1, 'public_ratings', '0');
 
@@ -138,11 +137,6 @@ INSERT INTO artist_alias (id, name, sort_name, artist, edits_pending)
 
 INSERT INTO artist_alias (id, name, sort_name, artist)
     VALUES (2, 'Test Alias', 'Test Alias', 5);
-
-INSERT INTO label_alias_type (id, name) VALUES (1, 'Search hint');
-INSERT INTO label_alias (id, name, sort_name, label, edits_pending, type)
-    VALUES (1, 'Test Label Alias', 'Test Label Alias', 2, 2, 1);
-
 
 INSERT INTO artist (id, gid, name, sort_name, begin_date_year, begin_date_month, begin_date_day, type)
     VALUES (7, '4b585938-f271-45e2-b19a-91c634b5e396', 'Kate Bush', 'Bush, Kate', 1958, 7, 30, 1);
@@ -155,11 +149,12 @@ INSERT INTO release_group (id, gid, name, artist_credit, type) VALUES
 
 INSERT INTO release (id, gid, name, artist_credit, release_group, status, barcode) VALUES (2, 'f205627f-b70a-409d-adbe-66289b614e80', 'Aerial', 3, 2, 1, '0094634396028');
 INSERT INTO release_country (release, country, date_year, date_month, date_day) VALUES (2, 221, 2005, 11, 7);
-;
+
+INSERT INTO release_alias (id, name, sort_name, release, edits_pending)
+    VALUES (1, 'Ærial', 'Ærial', 2, 0);
 
 INSERT INTO release (id, gid, name, artist_credit, release_group, status, barcode) VALUES (3, '9b3d9383-3d2a-417f-bfbb-56f7c15f075b', 'Aerial', 3, 2, 1, '0827969777220');
 INSERT INTO release_country (release, country, date_year, date_month, date_day) VALUES (3, 222, 2005, 11, 8);
-;
 
 INSERT INTO release_label (id, release, label, catalog_number)
     VALUES (3, 2, 2, '343 960 2');
@@ -207,6 +202,9 @@ INSERT INTO recording (id, gid, name, artist_credit, length) VALUES
 INSERT INTO recording (id, gid, name, artist_credit, length) VALUES
     (17, '1539ac10-5081-4469-b8f2-c5896132724e', 'Aerial', 3, 472880);
 
+INSERT INTO recording_alias (id, name, sort_name, recording, edits_pending)
+    VALUES (1, 'King of the Mt.', 'King of the Mt.', 2, 0);
+
 INSERT INTO track (id, gid, medium, position, number, recording, name, artist_credit, length) VALUES (4, '39164965-d4bd-49e6-925d-72026ad03dce', 3, 1, 1, 2, 'King of the Mountain', 3, 293720);
 INSERT INTO track (id, gid, medium, position, number, recording, name, artist_credit, length) VALUES (5, '82edb036-4097-484d-ac8a-cf4971451ca0', 3, 2, 2, 3, 'π', 3, 369680);
 INSERT INTO track (id, gid, medium, position, number, recording, name, artist_credit, length) VALUES (6, '37e395f0-a23e-45a2-9e67-60de472767e7', 3, 3, 3, 4, 'Bertie', 3, 258839);
@@ -246,32 +244,13 @@ INSERT INTO track (id, gid, medium, position, number, recording, name, artist_cr
 INSERT INTO isrc (isrc, recording) VALUES ('DEE250800231', 1);
 INSERT INTO isrc (isrc, recording) VALUES ('DEE250800230', 2);
 
-INSERT INTO link_attribute_type (id, root, gid, name)
-    VALUES (1, 1, '36990974-4f29-4ea1-b562-3838fa9b8832', 'additional');
-INSERT INTO link_attribute_type (id, root, gid, name)
-    VALUES (14, 14, '108d76bd-95eb-4099-aed6-447e4ec78553', 'instrument');
-INSERT INTO link_attribute_type (id, parent, root, gid, name)
-    VALUES (3, 14, 14, '4f7bb10f-396c-466a-8221-8e93f5e454f9', 'String Instruments');
-INSERT INTO link_attribute_type (id, parent, root, gid, name)
-    VALUES (4, 3, 14, 'c3273296-91ba-453d-94e4-2fb6e958568e', 'Guitar');
+INSERT INTO link (id, link_type, attribute_count) VALUES (1, 148, 1);
+INSERT INTO link (id, link_type, attribute_count) VALUES (2, 148, 2);
+INSERT INTO link (id, link_type, attribute_count, begin_date_year) VALUES (3, 183, 0, 2006);
 
-INSERT INTO link_creditable_attribute_type (attribute_type) VALUES (3), (4);
-
-INSERT INTO link_type (id, gid, entity_type0, entity_type1, name, link_phrase, reverse_link_phrase, long_link_phrase, description)
-    VALUES (1, '7610b0e9-40c1-48b3-b06c-2c1d30d9dc3e', 'artist', 'recording', 'instrument', 'performed {additional} {instrument} on', 'has {additional} {instrument} performed by', 'performer', 'description'),
-           (2, 'f8673e29-02a5-47b7-af61-dd4519328dd0', 'artist', 'recording', 'performance', 'performance', 'performance', 'performance', '');
-
-INSERT INTO link_type_attribute_type (link_type, attribute_type, min, max)
-    VALUES (1, 1, 0, 1);
-INSERT INTO link_type_attribute_type (link_type, attribute_type, min, max)
-    VALUES (1, 14, 1, NULL);
-
-INSERT INTO link (id, link_type, attribute_count) VALUES (1, 1, 1);
-INSERT INTO link (id, link_type, attribute_count) VALUES (2, 1, 2);
-
-INSERT INTO link_attribute (link, attribute_type) VALUES (1, 4);
+INSERT INTO link_attribute (link, attribute_type) VALUES (1, 229);
 INSERT INTO link_attribute (link, attribute_type) VALUES (2, 1);
-INSERT INTO link_attribute (link, attribute_type) VALUES (2, 3);
+INSERT INTO link_attribute (link, attribute_type) VALUES (2, 302);
 
 INSERT INTO artist (id, gid, name, sort_name)
     VALUES
@@ -282,6 +261,7 @@ INSERT INTO artist (id, gid, name, sort_name, comment) VALUES
 INSERT INTO l_artist_recording (id, link, entity0, entity1) VALUES (1, 1, 8, 2);
 INSERT INTO l_artist_recording (id, link, entity0, entity1, edits_pending) VALUES (2, 1, 9, 2, 1);
 INSERT INTO l_artist_recording (id, link, entity0, entity1) VALUES (3, 2, 8, 3);
+INSERT INTO l_artist_url (id, link, entity0, entity1) VALUES (1, 3, 8, 1);
 
 INSERT INTO annotation (id, editor, text) VALUES (1, 1, 'Test annotation 1' || chr(10) || chr(10) || 'More annotation');
 INSERT INTO annotation (id, editor, text) VALUES (2, 1, 'Test annotation 2.');
@@ -318,36 +298,5 @@ INSERT INTO cdtoc (id, discid, freedb_id, track_count, leadout_offset, track_off
      ARRAY[150,22179,49905,69318,96240,121186,143398]);
 INSERT INTO medium_cdtoc (id, medium, cdtoc) VALUES
     (1, 3, 2);
-
--- Restart sequences
-ALTER SEQUENCE gender_id_seq RESTART 3;
-ALTER SEQUENCE artist_id_seq RESTART 10;
-ALTER SEQUENCE artist_credit_id_seq RESTART 5;
-ALTER SEQUENCE label_id_seq RESTART 5;
-ALTER SEQUENCE medium_id_seq RESTART 7;
-ALTER SEQUENCE recording_id_seq RESTART 18;
-ALTER SEQUENCE release_id_seq RESTART 4;
-ALTER SEQUENCE release_group_id_seq RESTART 5;
-ALTER SEQUENCE work_id_seq RESTART 2;
-ALTER SEQUENCE url_id_seq RESTART 2;
-
-ALTER SEQUENCE annotation_id_seq RESTART 8;
-
-ALTER SEQUENCE artist_alias_id_seq RESTART 8;
-ALTER SEQUENCE label_alias_id_seq RESTART 8;
-ALTER SEQUENCE track_id_seq RESTART 20;
-ALTER SEQUENCE medium_id_seq RESTART 7;
-ALTER SEQUENCE release_label_id_seq RESTART 5;
-
-ALTER SEQUENCE tag_id_seq RESTART 100;
-
-ALTER SEQUENCE link_id_seq RESTART 3;
-ALTER SEQUENCE link_type_id_seq RESTART 3;
-ALTER SEQUENCE link_attribute_type_id_seq RESTART 5;
-
-ALTER SEQUENCE l_artist_recording_id_seq RESTART 4;
-
-SELECT setval('artist_id_seq', (SELECT MAX(id) FROM artist));
-SELECT setval('editor_id_seq', (SELECT MAX(id) FROM editor));
 
 SET client_min_messages TO 'NOTICE';

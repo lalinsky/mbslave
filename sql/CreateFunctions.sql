@@ -387,6 +387,76 @@ RETURNS trigger AS $$
 $$ LANGUAGE 'plpgsql';
 
 -----------------------------------------------------------------------
+-- alternative tracklist triggers
+-----------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION inc_nullable_artist_credit(row_id integer) RETURNS void AS $$
+BEGIN
+    IF row_id IS NOT NULL THEN
+        PERFORM inc_ref_count('artist_credit', row_id, 1);
+    END IF;
+    RETURN;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION dec_nullable_artist_credit(row_id integer) RETURNS void AS $$
+BEGIN
+    IF row_id IS NOT NULL THEN
+        PERFORM dec_ref_count('artist_credit', row_id, 1);
+    END IF;
+    RETURN;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION a_ins_alternative_release_or_track() RETURNS trigger AS $$
+BEGIN
+    PERFORM inc_nullable_artist_credit(NEW.artist_credit);
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION a_upd_alternative_release_or_track() RETURNS trigger AS $$
+BEGIN
+    IF NEW.artist_credit IS DISTINCT FROM OLD.artist_credit THEN
+        PERFORM inc_nullable_artist_credit(NEW.artist_credit);
+        PERFORM dec_nullable_artist_credit(OLD.artist_credit);
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION a_del_alternative_release_or_track() RETURNS trigger AS $$
+BEGIN
+    PERFORM dec_nullable_artist_credit(OLD.artist_credit);
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION a_ins_alternative_medium_track() RETURNS trigger AS $$
+BEGIN
+    PERFORM inc_ref_count('alternative_track', NEW.alternative_track, 1);
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION a_upd_alternative_medium_track() RETURNS trigger AS $$
+BEGIN
+    IF NEW.alternative_track IS DISTINCT FROM OLD.alternative_track THEN
+        PERFORM inc_ref_count('alternative_track', NEW.alternative_track, 1);
+        PERFORM dec_ref_count('alternative_track', OLD.alternative_track, 1);
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION a_del_alternative_medium_track() RETURNS trigger AS $$
+BEGIN
+    PERFORM dec_ref_count('alternative_track', OLD.alternative_track, 1);
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
+-----------------------------------------------------------------------
 -- lastupdate triggers
 -----------------------------------------------------------------------
 
@@ -640,23 +710,6 @@ END;
 $$ LANGUAGE 'plpgsql';
 
 -------------------------------------------------------------------
--- Delete tags and return them for use in sub queries
--------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION delete_tags(enttype TEXT, ids INTEGER[])
-RETURNS TABLE(editor INT, tag INT) AS $$
-DECLARE
-    tablename TEXT;
-BEGIN
-    tablename = enttype || '_tag_raw';
-    RETURN QUERY
-       EXECUTE 'DELETE FROM ' || tablename || ' WHERE ' || enttype || ' = any($1)
-                RETURNING editor, tag'
-         USING ids;
-    RETURN;
-END;
-$$ LANGUAGE 'plpgsql';
-
--------------------------------------------------------------------
 -- Prevent link attributes being used on links that don't support them
 -------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION prevent_invalid_attributes()
@@ -751,6 +804,10 @@ BEGIN
 
     IF TG_TABLE_NAME LIKE 'l_%_url' THEN
       EXECUTE delete_unused_url(ARRAY[OLD.entity1]);
+    END IF;
+
+    IF TG_TABLE_NAME LIKE 'url' THEN
+      EXECUTE delete_unused_url(ARRAY[OLD.id, NEW.id]);
     END IF;
 
     RETURN NULL;
@@ -978,6 +1035,7 @@ AS $$
       -- Remove references from tables that don't change whether or not this recording
       -- is orphaned.
       DELETE FROM isrc WHERE recording = OLD.recording;
+      DELETE FROM recording_alias WHERE recording = OLD.recording;
       DELETE FROM recording_annotation WHERE recording = OLD.recording;
       DELETE FROM recording_gid_redirect WHERE new_id = OLD.recording;
       DELETE FROM recording_rating_raw WHERE recording = OLD.recording;
@@ -1091,4 +1149,20 @@ CREATE OR REPLACE FUNCTION track_count_matches_cdtoc(medium, int) RETURNS boolea
 $$ LANGUAGE SQL IMMUTABLE;
 
 COMMIT;
+
+-----------------------------------------------------------------------
+-- edit_note triggers
+-----------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION a_ins_edit_note() RETURNS trigger AS $$
+BEGIN
+    INSERT INTO edit_note_recipient (recipient, edit_note) (
+        SELECT edit.editor, NEW.id
+          FROM edit
+         WHERE edit.id = NEW.edit
+    );
+    RETURN NULL;
+END;
+$$ LANGUAGE 'plpgsql';
+
 -- vi: set ts=4 sw=4 et :
