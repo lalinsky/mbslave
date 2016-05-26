@@ -9,6 +9,9 @@ user to user.
 ## Installation
 
  0. Make sure you have [Python](http://python.org/) and [psycopg2](http://initd.org/psycopg/) installed.
+    On Debian and Ubuntu, that means installing these packages:
+
+        sudo apt install python-psycopg2
 
  1. Create `mbslave.conf` by copying and editing `mbslave.conf.default`.
     You will need to get the API token on the [MetaBrainz website](https://test.metabrainz.org/).
