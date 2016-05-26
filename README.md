@@ -23,12 +23,16 @@ user to user.
 
  2. Prepare empty schemas for the MusicBrainz database and create the table structure:
 
+        echo 'CREATE EXTENSION cube;' | ./mbslave-psql.py -S
+        echo 'CREATE EXTENSION earthdistance;' | ./mbslave-psql.py -S
+
         echo 'CREATE SCHEMA musicbrainz;' | ./mbslave-psql.py -S
         echo 'CREATE SCHEMA statistics;' | ./mbslave-psql.py -S
         echo 'CREATE SCHEMA cover_art_archive;' | ./mbslave-psql.py -S
         echo 'CREATE SCHEMA wikidocs;' | ./mbslave-psql.py -S
         echo 'CREATE SCHEMA documentation;' | ./mbslave-psql.py -S
-        ./mbslave-remap-schema.py <sql/CreateTables.sql | sed 's/CUBE/TEXT/' | ./mbslave-psql.py
+
+        ./mbslave-remap-schema.py <sql/CreateTables.sql | ./mbslave-psql.py
         ./mbslave-remap-schema.py <sql/statistics/CreateTables.sql | ./mbslave-psql.py
         ./mbslave-remap-schema.py <sql/caa/CreateTables.sql | ./mbslave-psql.py
         ./mbslave-remap-schema.py <sql/wikidocs/CreateTables.sql | ./mbslave-psql.py
@@ -49,7 +53,7 @@ user to user.
         ./mbslave-remap-schema.py <sql/wikidocs/CreatePrimaryKeys.sql | ./mbslave-psql.py
         ./mbslave-remap-schema.py <sql/documentation/CreatePrimaryKeys.sql | ./mbslave-psql.py
 
-        ./mbslave-remap-schema.py <sql/CreateIndexes.sql | grep -vE '(collate|medium_index)' | ./mbslave-psql.py
+        ./mbslave-remap-schema.py <sql/CreateIndexes.sql | grep -v musicbrainz_collate | ./mbslave-psql.py
         ./mbslave-remap-schema.py <sql/CreateSlaveIndexes.sql | ./mbslave-psql.py
         ./mbslave-remap-schema.py <sql/statistics/CreateIndexes.sql | ./mbslave-psql.py
         ./mbslave-remap-schema.py <sql/caa/CreateIndexes.sql | ./mbslave-psql.py
