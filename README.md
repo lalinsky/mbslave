@@ -20,11 +20,10 @@ user to user.
         createuser musicbrainz
         createdb -l C -E UTF-8 -T template0 -O musicbrainz musicbrainz
         createlang plpgsql musicbrainz
+        psql musicbrainz -c 'CREATE EXTENSION cube'
+        psql musicbrainz -c 'CREATE EXTENSION earthdistance'
 
  2. Prepare empty schemas for the MusicBrainz database and create the table structure:
-
-        echo 'CREATE EXTENSION cube;' | ./mbslave-psql.py -S
-        echo 'CREATE EXTENSION earthdistance;' | ./mbslave-psql.py -S
 
         echo 'CREATE SCHEMA musicbrainz;' | ./mbslave-psql.py -S
         echo 'CREATE SCHEMA statistics;' | ./mbslave-psql.py -S
