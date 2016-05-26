@@ -23,8 +23,8 @@ user to user.
         createuser musicbrainz
         createdb -l C -E UTF-8 -T template0 -O musicbrainz musicbrainz
         createlang plpgsql musicbrainz
-        psql musicbrainz -c 'CREATE EXTENSION cube'
-        psql musicbrainz -c 'CREATE EXTENSION earthdistance'
+        psql musicbrainz -c 'CREATE EXTENSION cube;'
+        psql musicbrainz -c 'CREATE EXTENSION earthdistance;'
 
  2. Prepare empty schemas for the MusicBrainz database and create the table structure:
 
