@@ -66,6 +66,52 @@ user to user.
 
         echo 'VACUUM ANALYZE;' | ./mbslave-psql.py
 
+## Tips and Tricks
+
+### Single Database Schema
+
+MusicBrainz used a number of schemas by default. If you are embedding the MusicBrainz database into
+an existing database for your application, it's convenient to merge them all into a single schema.
+That can be done by changing your config like this:
+
+    [schemas]
+    musicbrainz=musicbrainz
+    statistics=musicbrainz
+    cover_art_archive=musicbrainz
+    wikidocs=musicbrainz
+    documentation=musicbrainz
+
+After this, you only need to create the `musicbrainz` schema and import all the tables there.
+
+### No PostgreSQL Extensions
+
+You can avoid installing the `cube` and `earthdistance` extensions if you map the `CUBE` column to `TEXT`
+and remove some indexes.
+
+You might do a similar thing with `JSONB` columns, if you don't want to upgrade to PostgreSQL 9.5 yet.
+
+Replace the commands above with something like his:
+
+    ./mbslave-remap-schema.py <sql/CreateTables.sql | \
+        perl -pe 's{\b(CUBE|JSONB)\b}{TEXT}' | \
+        ./mbslave-psql.py
+
+    ./mbslave-remap-schema.py <sql/CreateIndexes.sql | \
+        grep -v musicbrainz_collate | \
+        grep -v ll_to_earth | \
+        grep -v medium_index | \
+        perl -pe 's{\bUSING BRIN\b}{}' | \
+        perl -pe 'BEGIN { undef $/; } s{^CREATE INDEX edit_data_idx_link_type .*?;}{}smg' | \
+        ./mbslave-psql.py
+
+### Full Import Upgrade
+
+You can use the schema mapping feature to do zero-downtime upgrade of the database with full
+data import. You can temporarily map all schemas to e.g. `musicbrainz_NEW`, import your new
+database there and then rename it.
+
+    echo 'BEGIN; ALTER SCHEMA musicbrainz RENAME TO musicbrainz_OLD; ALTER SCHEMA musicbrainz_NEW RENAME TO musicbrainz; COMMIT;' | ./mbslave-psql.py -S
+
 ## Replication
 
 After the initial database setup, you might want to update the database with the latest data.
