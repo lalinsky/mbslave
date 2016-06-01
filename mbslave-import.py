@@ -6,7 +6,7 @@ import os
 from mbslave import Config, connect_db, parse_name, check_table_exists, fqn
 
 
-def load_tar(filename, db, config, ignored_tables):
+def load_tar(filename, db, config, ignored_schemas, ignored_tables):
     print "Importing data from", filename
     tar = tarfile.open(filename, 'r:bz2')
     cursor = db.cursor()
@@ -16,6 +16,9 @@ def load_tar(filename, db, config, ignored_tables):
         name = member.name.split('/')[1].replace('_sanitised', '')
         schema, table = parse_name(config, name)
         fulltable = fqn(schema, table)
+        if schema in ignored_schemas:
+            print " - Ignoring", name
+            continue
         if table in ignored_tables:
             print " - Ignoring", name
             continue
@@ -34,7 +37,7 @@ def load_tar(filename, db, config, ignored_tables):
 config = Config(os.path.dirname(__file__) + '/mbslave.conf')
 db = connect_db(config)
 
+ignored_schemas = set(config.get('schemas', 'ignore').split(','))
 ignored_tables = set(config.get('TABLES', 'ignore').split(','))
 for filename in sys.argv[1:]:
-    load_tar(filename, db, config, ignored_tables)
-
+    load_tar(filename, db, config, ignored_schemas, ignored_tables)
