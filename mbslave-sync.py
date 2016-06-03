@@ -47,11 +47,12 @@ def read_psql_dump(fp, types):
 
 class PacketImporter(object):
 
-    def __init__(self, db, config, ignored_tables, replication_seq, hook):
+    def __init__(self, db, config, ignored_schemas, ignored_tables, replication_seq, hook):
         self._db = db
         self._data = {}
         self._transactions = {}
         self._config = config
+        self._ignored_schemas = ignored_schemas
         self._ignored_tables = ignored_tables
         self._hook = hook
         self._replication_seq = replication_seq
@@ -78,6 +79,8 @@ class PacketImporter(object):
             #print 'BEGIN; --', xid
             for id, schema, table, type in sorted(transaction):
                 if schema == '<ignore>':
+                    continue
+                if schema in self._ignored_schemas:
                     continue
                 if table in self._ignored_tables:
                     continue
@@ -122,10 +125,10 @@ class PacketImporter(object):
         self._hook.after_commit()
 
 
-def process_tar(fileobj, db, schema, ignored_tables, expected_schema_seq, replication_seq, hook):
+def process_tar(fileobj, db, schema, ignored_schemas, ignored_tables, expected_schema_seq, replication_seq, hook):
     print "Processing", fileobj.name
     tar = tarfile.open(fileobj=fileobj, mode='r:bz2')
-    importer = PacketImporter(db, schema, ignored_tables, replication_seq, hook)
+    importer = PacketImporter(db, schema, ignored_schemas, ignored_tables, replication_seq, hook)
     for member in tar:
         if member.name == 'SCHEMA_SEQUENCE':
             schema_seq = int(tar.extractfile(member).read().strip())
@@ -166,6 +169,7 @@ if config.has_option('MUSICBRAINZ', 'token'):
     token = config.get('MUSICBRAINZ', 'token')
 else:
     token = None
+ignored_schemas = set(config.get('schemas', 'ignore').split(','))
 ignored_tables = set(config.get('TABLES', 'ignore').split(','))
 
 hook_class = ReplicationHook
@@ -186,7 +190,7 @@ while True:
         print 'Not found, stopping'
         status.end()
         break
-    process_tar(tmp, db, config, ignored_tables, schema_seq, replication_seq, hook)
+    process_tar(tmp, db, config, ignored_schemas, ignored_tables, schema_seq, replication_seq, hook)
     tmp.close()
     status.update(replication_seq)
 
