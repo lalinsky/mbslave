@@ -14,7 +14,7 @@ user to user.
         sudo apt install python python-psycopg2
 
  1. Create `mbslave.conf` by copying and editing `mbslave.conf.default`.
-    You will need to get the API token on the [MetaBrainz website](https://test.metabrainz.org/).
+    You will need to get the API token on the [MetaBrainz website](https://metabrainz.org/supporters/account-type).
 
  1. Setup the database. If you are starting completely from scratch,
     you can use the following commands to setup a clean database:
