@@ -133,6 +133,11 @@ When the MusicBrainz database schema changes, the replication will stop working.
 This is usually announced on the [MusicBrainz blog](http://blog.musicbrainz.org/).
 When it happens, you need to upgrade the database.
 
-### Release 2016-05-24 (23)
+### Release 2017-05-25 (24)
 
-You need to do a full import for this version.
+Run the upgrade scripts:
+
+```
+./mbslave-remap-schema.py <sql/updates/schema-change/24.slave.sql | ./mbslave-psql.py
+echo 'UPDATE replication_control SET current_schema_sequence = 24;' | ./mbslave-psql.py
+```
