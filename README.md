@@ -8,7 +8,7 @@ user to user.
 
 ## Installation
 
- 0. Make sure you have [Python](http://python.org/) and [psycopg2](http://initd.org/psycopg/) installed.
+ 0. Make sure you have [Python 2](http://python.org/) and [psycopg2](http://initd.org/psycopg/) installed.
     On Debian and Ubuntu, that means installing these packages:
 
         sudo apt install python python-psycopg2
