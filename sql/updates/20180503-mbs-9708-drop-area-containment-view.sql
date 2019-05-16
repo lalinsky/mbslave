@@ -1,0 +1,6 @@
+\set ON_ERROR_STOP 1
+BEGIN;
+
+DROP VIEW IF EXISTS area_containment;
+
+COMMIT;

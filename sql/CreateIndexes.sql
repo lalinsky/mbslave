@@ -94,6 +94,12 @@ CREATE UNIQUE INDEX event_type_idx_gid ON event_type (gid);
 
 CREATE UNIQUE INDEX gender_idx_gid ON gender (gid);
 
+CREATE UNIQUE INDEX genre_idx_gid ON genre (gid);
+CREATE UNIQUE INDEX genre_idx_name ON genre (LOWER(name));
+
+CREATE INDEX genre_alias_idx_genre ON genre_alias (genre);
+CREATE UNIQUE INDEX genre_alias_idx_primary ON genre_alias (genre, locale) WHERE primary_for_locale = TRUE AND locale IS NOT NULL;
+
 CREATE UNIQUE INDEX instrument_type_idx_gid ON instrument_type (gid);
 
 CREATE UNIQUE INDEX instrument_alias_type_idx_gid ON instrument_alias_type (gid);
@@ -619,16 +625,6 @@ CREATE UNIQUE INDEX work_type_idx_gid ON work_type (gid);
 CREATE INDEX artist_idx_lower_name ON artist (lower(name));
 CREATE INDEX label_idx_lower_name ON label (lower(name));
 
--- musicbrainz_collate indexes for unicode sorting
-CREATE INDEX release_idx_musicbrainz_collate ON release (musicbrainz_collate(name));
-CREATE INDEX release_group_idx_musicbrainz_collate ON release_group (musicbrainz_collate(name));
-CREATE INDEX artist_idx_musicbrainz_collate ON artist (musicbrainz_collate(name));
-CREATE INDEX artist_credit_idx_musicbrainz_collate ON artist_credit (musicbrainz_collate(name));
-CREATE INDEX artist_credit_name_idx_musicbrainz_collate ON artist_credit_name (musicbrainz_collate(name));
-CREATE INDEX label_idx_musicbrainz_collate ON label (musicbrainz_collate(name));
-CREATE INDEX track_idx_musicbrainz_collate ON track (musicbrainz_collate(name));
-CREATE INDEX recording_idx_musicbrainz_collate ON recording (musicbrainz_collate(name));
-CREATE INDEX work_idx_musicbrainz_collate ON work (musicbrainz_collate(name));
 
 CREATE INDEX alternative_release_idx_release ON alternative_release (release);
 CREATE INDEX alternative_release_idx_name ON alternative_release (name);
